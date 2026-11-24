@@ -943,10 +943,10 @@ export default function App() {
                   className="rounded-xl border border-slate-800 bg-[#0b101b] p-6"
                 >
                   <h2 className="mb-1 text-base font-bold text-white">
-                    On-Chain Covenant Policy Governance (`tightenCovenantPolicy`)
+                    On-Chain Covenant Policy Governance (<code className="font-mono text-indigo-300">tightenCovenantPolicy</code>)
                   </h2>
                   <p className="mb-4 text-xs text-slate-400">
-                    Authorized exclusively by the entity holding `localDeskSecret()` matching on-chain `entityCommitment`. Subsequent `attestSolvency()` proofs must satisfy the updated thresholds in zero knowledge.
+                    Authorized exclusively by the entity holding <code className="font-mono text-slate-200">localDeskSecret()</code> matching on-chain <code className="font-mono text-slate-200">entityCommitment</code>. Subsequent <code className="font-mono text-slate-200">attestSolvency()</code> proofs must satisfy the updated thresholds in zero knowledge.
                   </p>
 
                   <div className="space-y-4">
@@ -1003,7 +1003,7 @@ export default function App() {
                     </h2>
                   </div>
                   <p className="mb-4 text-xs text-slate-400">
-                    Test the compiled Compact assertion `assert(entityCommitment == deriveEntityCommitment(sk))` directly by substituting an unauthorized 32-byte key into the private witness context.
+                    Test the compiled Compact assertion <code className="font-mono text-slate-200">assert(entityCommitment == deriveEntityCommitment(sk))</code> directly by substituting an unauthorized 32-byte key into the private witness context.
                   </p>
 
                   <div className="mb-4 rounded-lg border border-slate-800 bg-[#07090f] p-3 font-mono text-[11px] text-slate-300">
@@ -1035,10 +1035,10 @@ export default function App() {
                     className="rounded-xl border border-indigo-500/30 bg-[#0b101b] p-5"
                   >
                     <h2 className="mb-1 text-sm font-bold text-white">
-                      Grant Selective Epoch Disclosure (`grantAuditorDisclosure`)
+                      Grant Selective Epoch Disclosure (<code className="font-mono text-indigo-300">grantAuditorDisclosure</code>)
                     </h2>
                     <p className="mb-4 text-xs text-slate-400">
-                      Publishes an epoch-scoped keyed tag in public `auditorGrants` so a named regulator can verify one historical snapshot without unlocking any other epoch.
+                      Publishes an epoch-scoped keyed tag in public <code className="font-mono text-slate-200">auditorGrants</code> so a named regulator can verify one historical snapshot without unlocking any other epoch.
                     </p>
 
                     <div className="space-y-3">
@@ -1077,7 +1077,7 @@ export default function App() {
 
                   <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-5">
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">
-                      On-Chain `auditorGrants` Registry ({session?.grants.length ?? 0})
+                      On-Chain <code className="font-mono text-indigo-300">auditorGrants</code> Registry ({session?.grants.length ?? 0})
                     </h3>
                     <div className="space-y-2">
                       {(session?.grants ?? []).map((g) => (
@@ -1111,19 +1111,27 @@ export default function App() {
                         Independent Auditor Cryptographic Verifier
                       </h2>
                       <p className="text-xs text-slate-400">
-                        Auditor receives off-chain reserve preimage privately, then runs Compact pure circuits `computeGrantKey` &amp; `computeReserveRoot` against Midnight ledger state.
+                        Auditor receives off-chain reserve preimage privately, then runs Compact pure circuits <code className="font-mono text-slate-200">computeGrantKey</code> &amp; <code className="font-mono text-slate-200">computeReserveRoot</code> against Midnight ledger state.
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
                         if (!priv || !pub) return;
-                        const firstGrant = session?.grants[0];
-                        setVerifyLabel(firstGrant?.auditorLabel ?? "finra-institutional-audit-2026");
+                        const matchingGrant =
+                          session?.grants.find((g) => g.targetEpoch === pub.lastAttestedEpoch) ??
+                          session?.grants[0];
+                        setVerifyLabel(matchingGrant?.auditorLabel ?? "finra-institutional-audit-2026");
                         setVerifyEpoch(pub.lastAttestedEpoch || "1");
                         setVerifyBalances([...priv.custodianBalancesUsd]);
                         setVerifyLiabilities(priv.totalLiabilitiesUsd);
                         setVerifySaltHex(priv.epochSaltHex);
+                        if (!session?.grants.some((g) => g.targetEpoch === pub.lastAttestedEpoch)) {
+                          setBanner({
+                            kind: "info",
+                            text: `Loaded Epoch #${pub.lastAttestedEpoch} private witness packet. Publish an Epoch #${pub.lastAttestedEpoch} disclosure grant on the left before verifying.`
+                          });
+                        }
                       }}
                       className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
                     >

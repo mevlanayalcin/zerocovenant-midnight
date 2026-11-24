@@ -111,15 +111,29 @@ export const VaultDiagram: React.FC<VaultDiagramProps> = ({
                 fill={breached ? "#e11d48" : "#6366f1"}
                 fillOpacity={0.88}
               />
-              <text
-                x={chartLeft + Math.min(barW, chartWidth - 95) + 6}
-                y={y + 15}
-                fill={breached ? "#fda4af" : "#e2e8f0"}
-                fontSize="10.5"
-                fontFamily="JetBrains Mono, monospace"
-              >
-                {sharePct.toFixed(1)}% ({formatCompactUsd(amt)})
-              </text>
+              {barW > chartWidth - 135 ? (
+                <text
+                  x={chartLeft + Math.min(barW, chartWidth) - 8}
+                  y={y + 15}
+                  textAnchor="end"
+                  fill="#ffffff"
+                  fontSize="10.5"
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="600"
+                >
+                  {sharePct.toFixed(1)}% ({formatCompactUsd(amt)})
+                </text>
+              ) : (
+                <text
+                  x={chartLeft + barW + 6}
+                  y={y + 15}
+                  fill={breached ? "#fda4af" : "#e2e8f0"}
+                  fontSize="10.5"
+                  fontFamily="JetBrains Mono, monospace"
+                >
+                  {sharePct.toFixed(1)}% ({formatCompactUsd(amt)})
+                </text>
+              )}
             </g>
           );
         })}
