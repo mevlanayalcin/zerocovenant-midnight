@@ -1,0 +1,5 @@
+node_modules
+dist
+.wrangler
+*.log
+contract/src/managed/zero_covenant/keys/*.prover

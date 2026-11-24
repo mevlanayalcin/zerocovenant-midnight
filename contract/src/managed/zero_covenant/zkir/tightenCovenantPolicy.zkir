@@ -1,0 +1,43 @@
+{
+  "version": { "major": 3, "minor": 1 },
+  "do_communications_commitment": true,
+  "inputs": [
+    { "name": "%newMinRatioBps.0", "type": "Scalar<BLS12-381>" },
+    { "name": "%newMaxSingleBps.1", "type": "Scalar<BLS12-381>" }
+  ],
+  "outputs": [
+  ],
+  "instructions": [
+    { "op": "constrain_bits", "val": "%newMinRatioBps.0", "bits": 64 },
+    { "op": "constrain_bits", "val": "%newMaxSingleBps.1", "bits": 64 },
+    { "op": "private_input", "type": "Scalar<BLS12-381>", "output": "%sk.2", "guard": null },
+    { "op": "constrain_bits", "val": "%sk.2", "bits": 8 },
+    { "op": "private_input", "type": "Scalar<BLS12-381>", "output": "%sk.3", "guard": null },
+    { "op": "constrain_bits", "val": "%sk.3", "bits": 248 },
+    { "op": "public_input", "type": "Scalar<BLS12-381>", "output": "%t.4", "guard": null },
+    { "op": "public_input", "type": "Scalar<BLS12-381>", "output": "%t.5", "guard": null },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x30"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x50", "0x01", "0x01", "0x02"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x0c", "0x01", "0x20", "%t.4", "%t.5"] },
+    { "op": "persistent_hash", "output": "%bytes.6", "alignment": [{ "tag": "atom", "value": { "length": 32, "tag": "bytes" } }, { "tag": "atom", "value": { "length": 32, "tag": "bytes" } }], "inputs": ["0x00", "0x7a633a656e746974793a7631", "%sk.2", "%sk.3"] },
+    { "op": "bytes_into_natives", "outputs": ["%t.7", "%t.8"], "bytes": "%bytes.6" },
+    { "op": "test_eq", "output": "%t.9", "a": "%t.4", "b": "%t.8" },
+    { "op": "test_eq", "output": "%t.10", "a": "%t.5", "b": "%t.7" },
+    { "op": "cond_select", "output": "%t.11", "bit": "%t.9", "a": "%t.10", "b": "0x00" },
+    { "op": "assert", "cond": "%t.11" },
+    { "op": "less_than", "output": "%t.12", "a": "%newMinRatioBps.0", "b": "0x1027", "bits": 64 },
+    { "op": "cond_select", "output": "%t.13", "bit": "%t.12", "a": "0x00", "b": "0x01" },
+    { "op": "assert", "cond": "%t.13" },
+    { "op": "less_than", "output": "%t.14", "a": "%newMaxSingleBps.1", "b": "0xe803", "bits": 64 },
+    { "op": "less_than", "output": "%t.15", "a": "0x1027", "b": "%newMaxSingleBps.1", "bits": 64 },
+    { "op": "cond_select", "output": "%t.16", "bit": "%t.15", "a": "0x00", "b": "0x01" },
+    { "op": "cond_select", "output": "%t.17", "bit": "%t.14", "a": "0x00", "b": "%t.16" },
+    { "op": "assert", "cond": "%t.17" },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x10", "0x01", "0x01", "0x01", "0x03"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x11", "0x01", "0x01", "0x08", "%newMinRatioBps.0"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x91"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x10", "0x01", "0x01", "0x01", "0x04"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x11", "0x01", "0x01", "0x08", "%newMaxSingleBps.1"] },
+    { "op": "impact", "guard": "0x01", "inputs": ["0x91"] }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "manifest-version": "1",
+  "compiler-version": "0.36.1",
+  "compiler-commit": "7fa3a117c5e7efe9d2c51da04263e5f0b3509144",
+  "language-version": "0.28.0",
+  "runtime-version": "0.21.0",
+  "compiler": {
+    "type": "directory",
+    "contract-info.json": {
+      "type": "file",
+      "size": 7155,
+      "hash": "9ab434c3af243598f1f825375160f930359b64f2269bd80ff3ce89a7d464d1b9"
+    }
+  },
+  "contract": {
+    "type": "directory",
+    "index.d.ts": {
+      "type": "file",
+      "size": 5457,
+      "hash": "265dfc9a062e130ba9bc15211fcbcd8e121e90c6be23a23324c62bbb15b91fde"
+    },
+    "index.js": {
+      "type": "file",
+      "size": 101924,
+      "hash": "a193d2732838469a6054dfa01605169b4b65743ebdc8761afe9fdb1799d09bb9"
+    },
+    "index.js.map": {
+      "type": "file",
+      "size": 4615,
+      "hash": "e6aaa8b7e383e6a1ec04f141d670020dc157deb8141ad91a91880745fe8e6aed"
+    }
+  },
+  "zkir": {
+    "type": "directory",
+    "attestSolvency.bzkir": {
+      "type": "file",
+      "size": 2629,
+      "hash": "c66047d53907a06b511d33761fc39d8b1be7b5fe6f557c9e590fb3ce67e8f4a2"
+    },
+    "attestSolvency.zkir": {
+      "type": "file",
+      "size": 9789,
+      "hash": "8af07743e8a7697de377714f58d62dc41b68817f8622cdd4832f72adfcfd8b4d"
+    },
+    "grantAuditorDisclosure.bzkir": {
+      "type": "file",
+      "size": 1051,
+      "hash": "9093b03490bd5e2920634a7de73321298ec0d62c0c5609d0164bbc0baf2930bd"
+    },
+    "grantAuditorDisclosure.zkir": {
+      "type": "file",
+      "size": 4048,
+      "hash": "ccd6e85488af32248973c3f7e5d07bdc636d57ad0a612860f8662f99f6b44234"
+    },
+    "tightenCovenantPolicy.bzkir": {
+      "type": "file",
+      "size": 826,
+      "hash": "813f5d4547951fc987d76bd656a672a7f549df5f006cce062853ea7de39611a5"
+    },
+    "tightenCovenantPolicy.zkir": {
+      "type": "file",
+      "size": 2946,
+      "hash": "b9a45dbe82268ede9d57fa2f58cd89c453708d09233ea2225270aff7c74bbf8a"
+    }
+  },
+  "keys": {
+    "type": "directory",
+    "attestSolvency.prover": {
+      "type": "file",
+      "size": 45095765,
+      "hash": "1cb71da6c80c54b5eb85681ba9ad87e7810e79e4d0432a874e5159aa96140a0f"
+    },
+    "attestSolvency.verifier": {
+      "type": "file",
+      "size": 2121,
+      "hash": "d6a304dd7e174852ad037b2bac2ae9457cde1ba53917a6dfa3d8378d3a7ae49c"
+    },
+    "grantAuditorDisclosure.prover": {
+      "type": "file",
+      "size": 11277611,
+      "hash": "e68b9a11f2226d55991cc837510d7993ec81e74ba8f0e31f868cc615d2161a5f"
+    },
+    "grantAuditorDisclosure.verifier": {
+      "type": "file",
+      "size": 2121,
+      "hash": "bd18217e3c52ae1af5745b49e24056f431b6c0eaca7474d88ffdab15ac6294af"
+    },
+    "tightenCovenantPolicy.prover": {
+      "type": "file",
+      "size": 11277386,
+      "hash": "2b2e5fd3d4f02ecb28fc41b60e424f45ffd6da35542859c3788b8acdaab7e24c"
+    },
+    "tightenCovenantPolicy.verifier": {
+      "type": "file",
+      "size": 2121,
+      "hash": "4dad7e7a86ddb2599c52449dd47f7bec05b5705b87840f08f03f716a78dc5a1a"
+    }
+  }
+}
