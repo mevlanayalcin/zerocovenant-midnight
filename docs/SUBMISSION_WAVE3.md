@@ -11,17 +11,18 @@
 **ZeroCovenant — Institutional ZK Proof-of-Solvency, Concentration Risk Covenants & Selective Auditor Disclosure on Midnight**
 
 ## Short Pitch (One-Liner)
-Privacy-preserving Proof-of-Solvency and Multi-Custodian Concentration Covenant protocol built with Midnight Compact v0.28 / Ledger 9 — proving reserve coverage and diversification in Zero-Knowledge while keeping all custodian balances, liabilities, and desk keys completely off-chain, plus selective epoch-scoped disclosure for regulators.
+Privacy-preserving Proof-of-Solvency and Multi-Custodian Concentration Covenant protocol built with Midnight Compact v0.28 / Ledger 9 — proving reserve coverage and diversification in Zero-Knowledge while keeping all custodian balances, liabilities, salts, and desk keys completely off-chain, plus root-bound selective epoch disclosure for regulators.
 
 ## Description / Overview
 Institutional crypto desks, RWA treasuries, and stablecoin issuers face a fundamental transparency paradox: traditional Proof-of-Reserves either leaks proprietary custodian balances publicly or checks only aggregate totals (`assets >= liabilities`), masking catastrophic single-venue concentration risks.
 
 **ZeroCovenant** solves both problems on Midnight:
-1. **Dual-Ledger Architecture (`contract/src/zero_covenant.compact`)**: All sensitive data (`deskSecret`, 4 custodian venue balances `b[0..3]`, `totalLiabilities`, `epochSalt`) resides exclusively in local `ZeroCovenantPrivateState` witnesses. Only commitments (`entityCommitment`, `lastSolvencyRoot`), covenant policy parameters, booleans, counters, anti-replay `usedNullifiers`, and keyed `auditorGrants` cross explicit `disclose(...)` boundaries to Midnight public state.
-2. **Real Compact Compilation (`compactc 0.36.1`, no `--skip-zk`)**: Produces real ZKIR circuits (`attestSolvency.zkir` 119 lines, `grantAuditorDisclosure.zkir` 55 lines, `tightenCovenantPolicy.zkir` 43 lines), BLS12-381 prover/verifier keys, and TypeScript Ledger 9 bindings running natively on `@midnight-ntwrk/compact-runtime@0.21.0` & `@midnight-ntwrk/onchain-runtime-v4@4.0.2`.
-3. **Interactive Adversarial & Verification Studio (`https://zerocovenant.mevlanayalcin.com.tr`)**: Judges can inspect private witness vs public ledger state side-by-side, trigger healthy attestations, observe Compact reject undercollateralized (`<120%`), single-custodian trap (`>40%` even at `150%` overall solvency!), replay nullifier, and rogue-key attacks, tighten on-chain risk covenants, and issue + independently verify selective auditor disclosures.
+1. **Dual-Ledger Privacy Architecture (`contract/src/zero_covenant.compact`)**: All sensitive data (`deskSecret`, 4 custodian venue balances `b[0..3]`, `totalLiabilities`, `epochSalt`) resides exclusively inside local `ZeroCovenantPrivateState` witnesses. Only commitments (`entityCommitment`, `lastSolvencyRoot`, historical `epochRoots: Map<Uint<64>, Bytes<32>>`), monotonic covenant parameters, booleans, counters, cross-epoch anti-replay `usedNullifiers`, and one-way root-bound `auditorGrants` cross explicit `disclose(...)` boundaries to Midnight public state.
+2. **Real Compact Compilation (`compactc 0.36.1`, no `--skip-zk`)**: Produces real ZKIR circuits (`attestSolvency.zkir`, `grantAuditorDisclosure.zkir`, `tightenCovenantPolicy.zkir`), BLS12-381 prover/verifier keys, and TypeScript Ledger 9 bindings running natively on `@midnight-ntwrk/compact-runtime@0.21.0` & `@midnight-ntwrk/onchain-runtime-v4@4.0.2`.
+3. **Zero-Leakage Isolated Studio (`https://zerocovenant.mevlanayalcin.com.tr`)**: Each visitor runs an isolated session with a CSPRNG `deskSecret` and `X-Session-Token` auth. `GET /api/v1/session` exposes **0 private witness fields** (transient prover witnesses are scrubbed after every circuit call; private balance sheets stay exclusively in the browser's local vault). Judges can trigger healthy attestations, observe Compact reject undercollateralized (`<120%`), zero-liability, single-custodian trap (`>40%` even at `150%` solvency), cross-epoch fixed-salt nullifier replay, covenant loosening, impossible `<25%` caps, and rogue-key attacks, and independently verify historical epochs against on-chain `epochRoots` & `auditorGrants`.
 
-## Entry Question Answers (Verify Discord / Telegram IDs Before Final Submit!)
-- **What is your Discord ID?** `<FILL_USER_DISCORD_ID>` (or check during final 1-click submit)
-- **What is your Telegram ID?** `<FILL_USER_TELEGRAM_ID>` (or check during final 1-click submit)
-- **Wallet / EVM / Midnight Payout Note:** Configured wallet on operator brief: `0xFf135CeD375351ACBB2e8b6F32C96ccDB2a10161`
+## Team & Payout Details
+- **Builder:** Mevlana Yalcin (Solo Engineer)
+- **Discord:** `mevlana9682`
+- **GitHub:** `https://github.com/mevlanayalcin`
+- **Payout Address (EVM):** `0xFf135CeD375351ACBB2e8b6F32C96ccDB2a10161`

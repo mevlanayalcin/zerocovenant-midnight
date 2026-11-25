@@ -5,9 +5,6 @@ export type Witnesses<PS> = {
   getCustodianBalances(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint[]];
   getTotalLiabilities(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
   getEpochSalt(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, Uint8Array];
-  getAuditorSecretTag(context: __compactRuntime.WitnessContext<Ledger, PS>,
-                      auditorPk_0: Uint8Array,
-                      epochVal_0: bigint): [PS, Uint8Array];
 }
 
 export type ImpureCircuits<PS> = {
@@ -32,20 +29,27 @@ export type ProvableCircuits<PS> = {
 
 export type PureCircuits = {
   deriveEntityCommitment(sk_0: Uint8Array): Uint8Array;
-  computeReserveRoot(b0_0: bigint,
+  computeReserveRoot(entityCommit_0: Uint8Array,
+                     epochVal_0: bigint,
+                     b0_0: bigint,
                      b1_0: bigint,
                      b2_0: bigint,
                      b3_0: bigint,
                      liabilities_0: bigint,
                      salt_0: Uint8Array): Uint8Array;
-  computeNullifier(sk_0: Uint8Array, epochVal_0: bigint, salt_0: Uint8Array): Uint8Array;
+  computeNullifier(sk_0: Uint8Array, salt_0: Uint8Array): Uint8Array;
   computeGrantKey(auditorPk_0: Uint8Array, targetEpoch_0: bigint): Uint8Array;
+  computeDisclosureTag(epochRoot_0: Uint8Array,
+                       auditorPk_0: Uint8Array,
+                       targetEpoch_0: bigint): Uint8Array;
 }
 
 export type Circuits<PS> = {
   deriveEntityCommitment(context: __compactRuntime.CircuitContext<PS>,
                          sk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
   computeReserveRoot(context: __compactRuntime.CircuitContext<PS>,
+                     entityCommit_0: Uint8Array,
+                     epochVal_0: bigint,
                      b0_0: bigint,
                      b1_0: bigint,
                      b2_0: bigint,
@@ -54,11 +58,14 @@ export type Circuits<PS> = {
                      salt_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
   computeNullifier(context: __compactRuntime.CircuitContext<PS>,
                    sk_0: Uint8Array,
-                   epochVal_0: bigint,
                    salt_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
   computeGrantKey(context: __compactRuntime.CircuitContext<PS>,
                   auditorPk_0: Uint8Array,
                   targetEpoch_0: bigint): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
+  computeDisclosureTag(context: __compactRuntime.CircuitContext<PS>,
+                       epochRoot_0: Uint8Array,
+                       auditorPk_0: Uint8Array,
+                       targetEpoch_0: bigint): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
   attestSolvency(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, Uint8Array>>;
   grantAuditorDisclosure(context: __compactRuntime.CircuitContext<PS>,
                          auditorPk_0: Uint8Array,
@@ -82,6 +89,13 @@ export type Ledger = {
     size(): bigint;
     member(elem_0: Uint8Array): boolean;
     [Symbol.iterator](): Iterator<Uint8Array>
+  };
+  epochRoots: {
+    isEmpty(): boolean;
+    size(): bigint;
+    member(key_0: bigint): boolean;
+    lookup(key_0: bigint): Uint8Array;
+    [Symbol.iterator](): Iterator<[bigint, Uint8Array]>
   };
   auditorGrants: {
     isEmpty(): boolean;

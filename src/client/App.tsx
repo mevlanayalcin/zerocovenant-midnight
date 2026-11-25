@@ -28,23 +28,8 @@ interface PublicLedgerSnapshot {
   lastSolvencyVerified: boolean;
   lastAttestedEpoch: string;
   usedNullifiersCount: string;
+  epochRootsCount: string;
   auditorGrantsCount: string;
-}
-
-interface PrivateWitnessSnapshot {
-  custodianLabels: [string, string, string, string];
-  custodianBalancesUsd: [string, string, string, string];
-  totalAssetsUsd: string;
-  totalLiabilitiesUsd: string;
-  excessBufferUsd: string;
-  reserveRatioBps: string;
-  reserveRatioPct: string;
-  maxSingleShareBps: string;
-  maxSingleSharePct: string;
-  maxCustodianIndex: number;
-  deskSecretMasked: string;
-  epochSaltHex: string;
-  compliantWithCurrentCovenant: boolean;
 }
 
 interface CircuitEventRecord {
@@ -74,14 +59,36 @@ interface AuditorGrantRecord {
   grantedAt: string;
 }
 
-interface DeskSessionState {
+interface PublicDeskSessionState {
   sessionId: string;
   deskName: string;
   publicLedger: PublicLedgerSnapshot;
-  privateWitness: PrivateWitnessSnapshot;
+  epochRoots: Record<string, string>;
   history: CircuitEventRecord[];
   grants: AuditorGrantRecord[];
   lastNullifierHex: string | null;
+}
+
+interface LocalEpochPacket {
+  epoch: string;
+  custodianBalancesUsd: [string, string, string, string];
+  totalLiabilitiesUsd: string;
+  epochSaltHex: string;
+}
+
+interface StoredVault {
+  sessionId: string;
+  sessionToken: string;
+  epochPackets: Record<string, LocalEpochPacket>;
+}
+
+interface ClientSeedBundle {
+  custodianLabels: [string, string, string, string];
+  epoch: string;
+  custodianBalancesUsd: [string, string, string, string];
+  totalLiabilitiesUsd: string;
+  epochSaltHex: string;
+  defaultAuditorLabel: string;
 }
 
 interface CompiledArtifacts {
@@ -108,11 +115,14 @@ interface CompiledArtifacts {
 interface VerificationResponse {
   verified: boolean;
   grantOnLedger: boolean;
+  rootMatchesEpoch: boolean;
+  tagMatchesLedger: boolean;
   ledgerTagHex: string | null;
+  recomputedTagHex: string;
   recomputedGrantKey: string;
   recomputedRoot: string;
+  ledgerEpochRootHex: string | null;
   ledgerRootHex: string;
-  rootMatchesLatest: boolean;
   targetEpoch: string;
   lastAttestedEpoch: string;
   auditedTotalAssetsUsd: string;
@@ -122,6 +132,14 @@ interface VerificationResponse {
 }
 
 type TabId = "studio" | "covenant" | "auditor" | "artifacts";
+
+const VAULT_STORAGE_KEY = "zerocovenant_local_vault_v2";
+const CUSTODIAN_LABELS: [string, string, string, string] = [
+  "Fireblocks Vault",
+  "Coinbase Prime Cold",
+  "Anchorage Digital",
+  "Copper ClearLoop"
+];
 
 function formatUsd(val: string | number): string {
   const n = Number(val);
@@ -138,16 +156,44 @@ function shortHex(hex: string, head = 12, tail = 8): string {
   return `${hex.slice(0, head)}...${hex.slice(-tail)}`;
 }
 
+function readStoredVault(): StoredVault | null {
+  try {
+    const raw = window.localStorage.getItem(VAULT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredVault;
+    if (parsed && typeof parsed.sessionId === "string" && typeof parsed.sessionToken === "string") {
+      return {
+        sessionId: parsed.sessionId,
+        sessionToken: parsed.sessionToken,
+        epochPackets: parsed.epochPackets ?? {}
+      };
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+function writeStoredVault(vault: StoredVault): void {
+  try {
+    window.localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vault));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 export default function App() {
   const [tab, setTab] = useState<TabId>("studio");
-  const [sessionId] = useState("alpha-treasury");
-  const [session, setSession] = useState<DeskSessionState | null>(null);
+  const [sessionId, setSessionId] = useState<string>("");
+  const [sessionToken, setSessionToken] = useState<string>("");
+  const [session, setSession] = useState<PublicDeskSessionState | null>(null);
   const [artifacts, setArtifacts] = useState<CompiledArtifacts | null>(null);
+  const [localEpochPackets, setLocalEpochPackets] = useState<Record<string, LocalEpochPacket>>({});
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ kind: "ok" | "err" | "info"; text: string } | null>(null);
 
-  // Witness form inputs
+  // Browser-local Private Witness form inputs (never fetched from GET /api/v1/session)
   const [balances, setBalances] = useState<[string, string, string, string]>([
     "3200000",
     "3100000",
@@ -156,7 +202,7 @@ export default function App() {
   ]);
   const [liabilities, setLiabilities] = useState("8000000");
   const [autoFreshSalt, setAutoFreshSalt] = useState(true);
-  const [manualSaltHex, setManualSaltHex] = useState("0x" + "21".repeat(32));
+  const [manualSaltHex, setManualSaltHex] = useState("0x" + "55".repeat(32));
 
   // Covenant policy inputs
   const [policyMinRatioBps, setPolicyMinRatioBps] = useState("12500");
@@ -176,7 +222,7 @@ export default function App() {
     "2800000"
   ]);
   const [verifyLiabilities, setVerifyLiabilities] = useState("8000000");
-  const [verifySaltHex, setVerifySaltHex] = useState("0x" + "21".repeat(32));
+  const [verifySaltHex, setVerifySaltHex] = useState("");
   const [verification, setVerification] = useState<VerificationResponse | null>(null);
 
   // Midnight Lace wallet status
@@ -190,27 +236,89 @@ export default function App() {
     label: "Scanning Lace..."
   });
 
-  const syncFromSession = useCallback((s: DeskSessionState) => {
+  const applyPublicSession = useCallback((s: PublicDeskSessionState) => {
     setSession(s);
-    setBalances([...s.privateWitness.custodianBalancesUsd]);
-    setLiabilities(s.privateWitness.totalLiabilitiesUsd);
-    setManualSaltHex(s.privateWitness.epochSaltHex);
     setTargetEpoch(s.publicLedger.lastAttestedEpoch || "1");
     setPolicyMinRatioBps(s.publicLedger.covenantMinRatioBps);
     setPolicyMaxSingleBps(s.publicLedger.covenantMaxSingleBps);
   }, []);
 
+  const persistSeed = useCallback(
+    (newSessionId: string, newToken: string, seed: ClientSeedBundle, pubState: PublicDeskSessionState) => {
+      const ep1: LocalEpochPacket = {
+        epoch: seed.epoch,
+        custodianBalancesUsd: [...seed.custodianBalancesUsd] as [string, string, string, string],
+        totalLiabilitiesUsd: seed.totalLiabilitiesUsd,
+        epochSaltHex: seed.epochSaltHex
+      };
+      const packets: Record<string, LocalEpochPacket> = { [seed.epoch]: ep1 };
+      setSessionId(newSessionId);
+      setSessionToken(newToken);
+      setLocalEpochPackets(packets);
+      setBalances([...ep1.custodianBalancesUsd]);
+      setLiabilities(ep1.totalLiabilitiesUsd);
+      setVerifyLabel(seed.defaultAuditorLabel);
+      setVerifyEpoch(ep1.epoch);
+      setVerifyBalances([...ep1.custodianBalancesUsd]);
+      setVerifyLiabilities(ep1.totalLiabilitiesUsd);
+      setVerifySaltHex(ep1.epochSaltHex);
+      writeStoredVault({ sessionId: newSessionId, sessionToken: newToken, epochPackets: packets });
+      applyPublicSession(pubState);
+    },
+    [applyPublicSession]
+  );
+
+  const initializeFreshSession = useCallback(async () => {
+    const res = await fetch("/api/v1/session/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deskName: "Institutional Treasury Desk" })
+    });
+    const json = (await res.json()) as {
+      ok: boolean;
+      sessionId: string;
+      sessionToken: string;
+      initialClientSeed: ClientSeedBundle;
+      session: PublicDeskSessionState;
+    };
+    if (!json.ok) throw new Error("Failed to create isolated desk session");
+    persistSeed(json.sessionId, json.sessionToken, json.initialClientSeed, json.session);
+  }, [persistSeed]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [sessRes, artRes] = await Promise.all([
-        fetch(`/api/v1/session?sessionId=${encodeURIComponent(sessionId)}`),
-        fetch("/api/v1/artifacts")
-      ]);
-      const sessJson = (await sessRes.json()) as { session: DeskSessionState };
-      const artJson = (await artRes.json()) as CompiledArtifacts;
-      syncFromSession(sessJson.session);
-      setArtifacts(artJson);
+      const artPromise = fetch("/api/v1/artifacts").then((r) => r.json() as Promise<CompiledArtifacts>);
+      const saved = readStoredVault();
+      let restored = false;
+
+      if (saved) {
+        const sessRes = await fetch(`/api/v1/session?sessionId=${encodeURIComponent(saved.sessionId)}`);
+        if (sessRes.ok) {
+          const sessJson = (await sessRes.json()) as { session: PublicDeskSessionState };
+          setSessionId(saved.sessionId);
+          setSessionToken(saved.sessionToken);
+          setLocalEpochPackets(saved.epochPackets);
+          const latestEp =
+            saved.epochPackets[sessJson.session.publicLedger.lastAttestedEpoch] ??
+            Object.values(saved.epochPackets)[0];
+          if (latestEp) {
+            setBalances([...latestEp.custodianBalancesUsd]);
+            setLiabilities(latestEp.totalLiabilitiesUsd);
+            setVerifyEpoch(latestEp.epoch);
+            setVerifyBalances([...latestEp.custodianBalancesUsd]);
+            setVerifyLiabilities(latestEp.totalLiabilitiesUsd);
+            setVerifySaltHex(latestEp.epochSaltHex);
+          }
+          applyPublicSession(sessJson.session);
+          restored = true;
+        }
+      }
+
+      if (!restored) {
+        await initializeFreshSession();
+      }
+      setArtifacts(await artPromise);
     } catch (err) {
       setBanner({
         kind: "err",
@@ -219,7 +327,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, syncFromSession]);
+  }, [applyPublicSession, initializeFreshSession]);
 
   useEffect(() => {
     void loadAll();
@@ -252,7 +360,7 @@ export default function App() {
     if (!w.midnight?.mnLace?.enable) {
       setBanner({
         kind: "info",
-        text: "Lace browser extension is not installed in this browser. All Compact ZK transitions run live against the compiled Ledger 9 server runtime."
+        text: "Lace browser extension is not installed in this browser. All Compact ZK transitions run live against the compiled Ledger 9 WASM runtime."
       });
       return;
     }
@@ -296,7 +404,10 @@ export default function App() {
     try {
       const res = await fetch("/api/v1/attest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken
+        },
         body: JSON.stringify({
           sessionId,
           custodianBalances: b,
@@ -309,13 +420,24 @@ export default function App() {
         ok: boolean;
         error?: string;
         event?: CircuitEventRecord;
-        state?: DeskSessionState;
+        state?: PublicDeskSessionState;
+        committedSaltHex?: string;
+        attestedEpoch?: string;
       };
-      if (json.state) syncFromSession(json.state);
-      if (json.ok) {
+      if (json.state) applyPublicSession(json.state);
+      if (json.ok && json.attestedEpoch && json.committedSaltHex) {
+        const packet: LocalEpochPacket = {
+          epoch: json.attestedEpoch,
+          custodianBalancesUsd: [...b] as [string, string, string, string],
+          totalLiabilitiesUsd: l,
+          epochSaltHex: json.committedSaltHex
+        };
+        const nextPackets = { ...localEpochPackets, [json.attestedEpoch]: packet };
+        setLocalEpochPackets(nextPackets);
+        writeStoredVault({ sessionId, sessionToken, epochPackets: nextPackets });
         setBanner({
           kind: "ok",
-          text: `ZK Attestation Verified -> Root ${shortHex(json.event?.reserveRootHex ?? "")} committed to Midnight Ledger (0 private bytes leaked).`
+          text: `Epoch #${json.attestedEpoch} ZK Attestation Verified -> Root ${shortHex(json.event?.reserveRootHex ?? "")} anchored in epochRoots (0 private bytes leaked).`
         });
       } else {
         setBanner({
@@ -336,11 +458,14 @@ export default function App() {
     try {
       const res = await fetch("/api/v1/attack/rogue-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken
+        },
         body: JSON.stringify({ sessionId })
       });
-      const json = (await res.json()) as { error: string; state: DeskSessionState };
-      syncFromSession(json.state);
+      const json = (await res.json()) as { error: string; state?: PublicDeskSessionState };
+      if (json.state) applyPublicSession(json.state);
       setBanner({
         kind: "ok",
         text: `Security Gate Enforced: Rogue key attestation blocked by Compact runtime ("${json.error}").`
@@ -357,19 +482,22 @@ export default function App() {
     try {
       const res = await fetch("/api/v1/policy/tighten", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken
+        },
         body: JSON.stringify({
           sessionId,
           minRatioBps: policyMinRatioBps,
           maxSingleBps: policyMaxSingleBps
         })
       });
-      const json = (await res.json()) as { ok: boolean; error?: string; state?: DeskSessionState };
-      if (json.state) syncFromSession(json.state);
+      const json = (await res.json()) as { ok: boolean; error?: string; state?: PublicDeskSessionState };
+      if (json.state) applyPublicSession(json.state);
       setBanner({
         kind: json.ok ? "ok" : "err",
         text: json.ok
-          ? `On-chain risk covenant updated via tightenCovenantPolicy().`
+          ? `On-chain risk covenant tightened via tightenCovenantPolicy(). Prior solvency flag reset to PENDING until fresh proof.`
           : `Policy update rejected: ${json.error}`
       });
     } finally {
@@ -384,7 +512,10 @@ export default function App() {
     try {
       const res = await fetch("/api/v1/disclosure/grant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken
+        },
         body: JSON.stringify({
           sessionId,
           auditorLabel,
@@ -395,13 +526,13 @@ export default function App() {
         ok: boolean;
         error?: string;
         grant?: AuditorGrantRecord;
-        state?: DeskSessionState;
+        state?: PublicDeskSessionState;
       };
-      if (json.state) syncFromSession(json.state);
+      if (json.state) applyPublicSession(json.state);
       setBanner({
         kind: json.ok ? "ok" : "err",
         text: json.ok
-          ? `Selective disclosure key granted to "${auditorLabel}" for Epoch #${targetEpoch}.`
+          ? `One-way disclosure tag published for "${auditorLabel}" on Epoch #${targetEpoch} (zero deskSecret exposure).`
           : `Grant rejected: ${json.error}`
       });
     } finally {
@@ -442,26 +573,42 @@ export default function App() {
 
   async function handleReset() {
     setBusyAction("reset");
-    const res = await fetch("/api/v1/session/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId })
-    });
-    const json = (await res.json()) as { session: DeskSessionState };
-    syncFromSession(json.session);
-    setVerification(null);
-    setBanner({ kind: "info", text: "Session reset to initial Epoch #1 institutional attestation state." });
-    setBusyAction(null);
+    try {
+      const res = await fetch("/api/v1/session/reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": sessionToken
+        },
+        body: JSON.stringify({ sessionId })
+      });
+      if (!res.ok) {
+        await initializeFreshSession();
+      } else {
+        const json = (await res.json()) as {
+          sessionId: string;
+          sessionToken: string;
+          initialClientSeed: ClientSeedBundle;
+          session: PublicDeskSessionState;
+        };
+        persistSeed(json.sessionId, json.sessionToken, json.initialClientSeed, json.session);
+      }
+      setVerification(null);
+      setBanner({ kind: "info", text: "Isolated session reset with fresh CSPRNG deskSecret and Epoch #1 seed." });
+    } finally {
+      setBusyAction(null);
+    }
   }
 
-  function downloadPreprodBundle() {
+  function downloadArtifactManifest() {
     const manifest = {
       protocol: "ZeroCovenant",
-      networkTarget: "midnight-preprod",
+      runtimeMode: "Midnight Ledger 9 WASM Local Prover",
+      networkTarget: "midnight-preview",
       compiler: artifacts?.compilerVersion ?? "0.36.1",
       languageVersion: artifacts?.languageVersion ?? "0.28.0",
       runtimeVersion: artifacts?.runtimeVersion ?? "0.21.0",
-      ledgerSnapshot: session?.publicLedger ?? null,
+      publicLedgerSnapshot: session?.publicLedger ?? null,
       compiledCircuits:
         artifacts?.circuits.map((c) => ({
           name: c.name,
@@ -476,20 +623,20 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "zerocovenant-midnight-bundle.json";
+    a.download = "zerocovenant-midnight-manifest.json";
     a.click();
     URL.revokeObjectURL(url);
   }
 
   const pub = session?.publicLedger;
-  const priv = session?.privateWitness;
 
   const liveTotal = balances.reduce((acc, v) => acc + (Number(v) || 0), 0);
   const liveLiab = Number(liabilities) || 0;
   const liveRatioPct = liveLiab > 0 ? (liveTotal / liveLiab) * 100 : 0;
   const liveMaxSharePct = liveTotal > 0 ? (Math.max(...balances.map((b) => Number(b) || 0)) / liveTotal) * 100 : 0;
-  const minRatioPct = (Number(pub?.covenantMinRatioBps ?? 12000) / 100);
-  const maxSinglePct = (Number(pub?.covenantMaxSingleBps ?? 4000) / 100);
+  const minRatioPct = Number(pub?.covenantMinRatioBps ?? 12000) / 100;
+  const maxSinglePct = Number(pub?.covenantMaxSingleBps ?? 4000) / 100;
+  const localPacketEpochs = Object.keys(localEpochPackets).sort((a, b) => Number(b) - Number(a));
 
   return (
     <div className="min-h-screen bg-[#07090f] text-slate-100">
@@ -501,14 +648,19 @@ export default function App() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-base font-bold tracking-tight text-white">ZeroCovenant</span>
                 <span className="rounded border border-indigo-500/40 bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-indigo-300">
-                  COMPACT v{artifacts?.languageVersion ?? "0.28.0"} · LEDGER 9
+                  COMPACT v{artifacts?.languageVersion ?? "0.28.0"} · LEDGER 9 WASM
                 </span>
+                {sessionId && (
+                  <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">
+                    ISOLATED DESK · {sessionId.slice(0, 12)}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-400">
-                Institutional ZK Proof-of-Solvency, Concentration Risk Covenant & Selective Auditor Disclosure on Midnight
+                Institutional ZK Proof-of-Solvency, Concentration Risk Covenant &amp; Selective Auditor Disclosure on Midnight
               </p>
             </div>
           </div>
@@ -531,7 +683,7 @@ export default function App() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-500 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${busyAction === "reset" ? "animate-spin" : ""}`} />
-              Reset Epoch #1
+              Reset Session
             </button>
           </div>
         </div>
@@ -571,18 +723,24 @@ export default function App() {
               <span className="font-mono text-2xl font-bold text-white">
                 Epoch #{pub?.lastAttestedEpoch ?? "—"}
               </span>
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-                {pub?.lastSolvencyVerified ? "VERIFIED" : "PENDING"}
+              <span
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                  pub?.lastSolvencyVerified
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "bg-amber-500/15 text-amber-300"
+                }`}
+              >
+                {pub?.lastSolvencyVerified ? "VERIFIED" : "RE-ATTEST REQUIRED"}
               </span>
             </div>
             <p className="mt-1 font-mono text-[11px] text-slate-500">
-              Attestations: {pub?.attestationCount ?? "0"} · Next Epoch #{pub?.epoch ?? "1"}
+              Attestations: {pub?.attestationCount ?? "0"} · Roots: {pub?.epochRootsCount ?? "0"}
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Private Reserve Ratio</span>
+              <span>Local Reserve Ratio</span>
               <EyeOff className="h-3.5 w-3.5 text-emerald-400" />
             </div>
             <div className="mt-1.5 flex items-baseline gap-2">
@@ -596,7 +754,7 @@ export default function App() {
               <span className="font-mono text-xs text-slate-400">≥ {minRatioPct.toFixed(1)}%</span>
             </div>
             <p className="mt-1 text-[11px] text-slate-500">
-              Held locally ({formatUsd(liveTotal)} vs {formatUsd(liveLiab)}) · 0 bytes on-chain
+              Browser vault ({formatUsd(liveTotal)} vs {formatUsd(liveLiab)}) · 0 bytes on GET
             </p>
           </div>
 
@@ -622,7 +780,7 @@ export default function App() {
 
           <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Anti-Replay & Grants</span>
+              <span>Anti-Replay &amp; Grants</span>
               <KeyRound className="h-3.5 w-3.5 text-cyan-400" />
             </div>
             <div className="mt-1.5 font-mono text-2xl font-bold text-white">
@@ -664,32 +822,32 @@ export default function App() {
 
         {loading && !session ? (
           <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-12 text-center text-sm text-slate-400">
-            Booting Midnight Ledger 9 WASM Runtime & Compact Contract State...
+            Booting Isolated Midnight Ledger 9 WASM Session...
           </div>
         ) : (
           <>
             {/* TAB 1: Dual-Ledger Proof Studio */}
             {tab === "studio" && (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                {/* LEFT COLUMN: Private Witness Vault */}
+                {/* LEFT COLUMN: Browser-Local Private Witness Vault */}
                 <div className="space-y-4 lg:col-span-6">
                   <div className="rounded-xl border border-emerald-500/30 bg-[#0b101b] p-5">
-                    <div className="mb-4 flex items-center justify-between">
+                    <div className="mb-4 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <EyeOff className="h-4 w-4 text-emerald-400" />
                         <h2 className="text-sm font-bold text-white">
-                          Private Witness Vault (Local Prover Only)
+                          Private Witness Vault (Browser-Local Only)
                         </h2>
                       </div>
                       <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-                        NEVER ON-CHAIN
+                        0 BYTES ON PUBLIC GET
                       </span>
                     </div>
 
                     {/* 1-click Scenarios */}
                     <div className="mb-4">
                       <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                        One-Click ZK Verification & Rejection Scenarios
+                        One-Click ZK Verification &amp; Rejection Scenarios
                       </p>
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <button
@@ -753,20 +911,15 @@ export default function App() {
                           }
                           className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-left text-xs hover:bg-indigo-500/20 disabled:opacity-50"
                         >
-                          <div className="font-semibold text-indigo-300">Fixed-Salt Nullifier Test</div>
-                          <div className="text-[11px] text-slate-400">Click twice w/ same epoch to test replay</div>
+                          <div className="font-semibold text-indigo-300">Cross-Epoch Salt Replay Test</div>
+                          <div className="text-[11px] text-slate-400">Click 1 passes; Click 2 -&gt; Nullifier REJECT</div>
                         </button>
                       </div>
                     </div>
 
                     {/* Editable Private Inputs */}
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {(priv?.custodianLabels ?? [
-                        "Fireblocks Vault",
-                        "Coinbase Prime Cold",
-                        "Anchorage Digital",
-                        "Copper ClearLoop"
-                      ]).map((lbl, idx) => (
+                      {CUSTODIAN_LABELS.map((lbl, idx) => (
                         <label key={lbl} className="block">
                           <span className="mb-1 block text-[11px] font-medium text-slate-400">
                             {lbl} (USD Private Witness b[{idx}])
@@ -790,7 +943,7 @@ export default function App() {
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <label className="block">
                         <span className="mb-1 block text-[11px] font-medium text-slate-400">
-                          Total Client Liabilities (USD Private Witness)
+                          Total Client Liabilities (USD &gt; 0)
                         </span>
                         <input
                           type="number"
@@ -810,7 +963,7 @@ export default function App() {
                             onChange={(e) => setAutoFreshSalt(e.target.checked)}
                             className="rounded border-slate-600 bg-slate-900 text-indigo-500"
                           />
-                          Auto-generate fresh 32-byte epoch blinding salt
+                          Auto-generate fresh 32-byte blinding salt
                         </label>
                         {!autoFreshSalt && (
                           <input
@@ -837,14 +990,7 @@ export default function App() {
                   </div>
 
                   <VaultDiagram
-                    labels={
-                      priv?.custodianLabels ?? [
-                        "Fireblocks Vault",
-                        "Coinbase Prime Cold",
-                        "Anchorage Digital",
-                        "Copper ClearLoop"
-                      ]
-                    }
+                    labels={CUSTODIAN_LABELS}
                     balancesUsd={balances}
                     maxCapBps={pub?.covenantMaxSingleBps ?? "4000"}
                   />
@@ -876,6 +1022,7 @@ export default function App() {
                         ["lastSolvencyRoot", shortHex(pub?.lastSolvencyRoot ?? "", 16, 10)],
                         ["lastSolvencyVerified", String(pub?.lastSolvencyVerified ?? false).toUpperCase()],
                         ["lastAttestedEpoch", pub?.lastAttestedEpoch ?? "0"],
+                        ["epochRoots.size()", pub?.epochRootsCount ?? "0"],
                         ["usedNullifiers.size()", pub?.usedNullifiersCount ?? "0"],
                         ["auditorGrants.size()", pub?.auditorGrantsCount ?? "0"]
                       ].map(([field, value]) => (
@@ -887,10 +1034,12 @@ export default function App() {
                     </div>
 
                     <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-200">
-                      <span className="font-semibold text-emerald-300">Zero-Leakage Audit:</span> Public state contains{" "}
-                      <span className="font-mono font-bold">0</span> USD balances,{" "}
-                      <span className="font-mono font-bold">0</span> counterparty names, and{" "}
-                      <span className="font-mono font-bold">0</span> liability figures.
+                      <span className="font-semibold text-emerald-300">Zero-Leakage Boundary:</span>{" "}
+                      <code className="font-mono">GET /api/v1/session</code> exposes{" "}
+                      <span className="font-mono font-bold">0</span> balances,{" "}
+                      <span className="font-mono font-bold">0</span> liabilities,{" "}
+                      <span className="font-mono font-bold">0</span> salts, and{" "}
+                      <span className="font-mono font-bold">0</span> deskSecret bytes. Transient prover memory is scrubbed after every circuit call.
                     </div>
                   </div>
 
@@ -943,16 +1092,16 @@ export default function App() {
                   className="rounded-xl border border-slate-800 bg-[#0b101b] p-6"
                 >
                   <h2 className="mb-1 text-base font-bold text-white">
-                    On-Chain Covenant Policy Governance (<code className="font-mono text-indigo-300">tightenCovenantPolicy</code>)
+                    Monotonic Covenant Tightening (<code className="font-mono text-indigo-300">tightenCovenantPolicy</code>)
                   </h2>
                   <p className="mb-4 text-xs text-slate-400">
-                    Authorized exclusively by the entity holding <code className="font-mono text-slate-200">localDeskSecret()</code> matching on-chain <code className="font-mono text-slate-200">entityCommitment</code>. Subsequent <code className="font-mono text-slate-200">attestSolvency()</code> proofs must satisfy the updated thresholds in zero knowledge.
+                    Authorized exclusively by <code className="font-mono text-slate-200">localDeskSecret()</code>. Enforces monotonic tightening only (<code className="font-mono text-slate-200">newMin ≥ current</code>, <code className="font-mono text-slate-200">2500 ≤ newMax ≤ current</code>) and resets <code className="font-mono text-slate-200">lastSolvencyVerified = false</code> until a fresh proof satisfies the stricter covenant.
                   </p>
 
                   <div className="space-y-4">
                     <label className="block">
                       <span className="mb-1 block text-xs font-medium text-slate-300">
-                        Minimum Reserve Ratio (bps, ≥ 10000 = 100.00%)
+                        Minimum Reserve Ratio (bps, ≥ current {pub?.covenantMinRatioBps ?? "12000"})
                       </span>
                       <input
                         type="number"
@@ -964,7 +1113,7 @@ export default function App() {
 
                     <label className="block">
                       <span className="mb-1 block text-xs font-medium text-slate-300">
-                        Maximum Single-Custodian Concentration (bps, 1000..10000)
+                        Maximum Single-Custodian Concentration (bps, 2500 .. {pub?.covenantMaxSingleBps ?? "4000"})
                       </span>
                       <input
                         type="number"
@@ -980,16 +1129,27 @@ export default function App() {
                         disabled={busyAction !== null}
                         className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
                       >
-                        Update Covenant via Compact Circuit
+                        Tighten Covenant via Compact Circuit
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setPolicyMinRatioBps("9500");
+                          setPolicyMinRatioBps("10000");
+                          setPolicyMaxSingleBps("10000");
                         }}
                         className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-300 hover:bg-rose-500/20"
                       >
-                        Preset Invalid (&lt;100% Ratio)
+                        Test Forbidden Loosening (100% / 100%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPolicyMinRatioBps(pub?.covenantMinRatioBps ?? "12000");
+                          setPolicyMaxSingleBps("2000");
+                        }}
+                        className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
+                      >
+                        Test Impossible Cap (&lt;25%)
                       </button>
                     </div>
                   </div>
@@ -1003,7 +1163,7 @@ export default function App() {
                     </h2>
                   </div>
                   <p className="mb-4 text-xs text-slate-400">
-                    Test the compiled Compact assertion <code className="font-mono text-slate-200">assert(entityCommitment == deriveEntityCommitment(sk))</code> directly by substituting an unauthorized 32-byte key into the private witness context.
+                    Tests <code className="font-mono text-slate-200">assert(disclose(entityCommitment == deriveEntityCommitment(sk)))</code> using valid balances + an unauthorized CSPRNG key, verifying the Compact circuit rejects specifically on desk secret authentication.
                   </p>
 
                   <div className="mb-4 rounded-lg border border-slate-800 bg-[#07090f] p-3 font-mono text-[11px] text-slate-300">
@@ -1038,7 +1198,7 @@ export default function App() {
                       Grant Selective Epoch Disclosure (<code className="font-mono text-indigo-300">grantAuditorDisclosure</code>)
                     </h2>
                     <p className="mb-4 text-xs text-slate-400">
-                      Publishes an epoch-scoped keyed tag in public <code className="font-mono text-slate-200">auditorGrants</code> so a named regulator can verify one historical snapshot without unlocking any other epoch.
+                      Anchors <code className="font-mono text-slate-200">computeDisclosureTag(epochRoots[epoch], auditorPk, epoch)</code> inside public <code className="font-mono text-slate-200">auditorGrants</code>. Zero secret-key material enters the tag.
                     </p>
 
                     <div className="space-y-3">
@@ -1095,7 +1255,7 @@ export default function App() {
                             GrantKey: {shortHex(g.grantKeyHex, 14, 10)}
                           </div>
                           <div className="font-mono text-[10px] text-slate-500">
-                            Tag: {shortHex(g.disclosureTagHex, 14, 10)}
+                            Tag (Hash): {shortHex(g.disclosureTagHex, 14, 10)}
                           </div>
                         </div>
                       ))}
@@ -1111,32 +1271,30 @@ export default function App() {
                         Independent Auditor Cryptographic Verifier
                       </h2>
                       <p className="text-xs text-slate-400">
-                        Auditor receives off-chain reserve preimage privately, then runs Compact pure circuits <code className="font-mono text-slate-200">computeGrantKey</code> &amp; <code className="font-mono text-slate-200">computeReserveRoot</code> against Midnight ledger state.
+                        Recomputes <code className="font-mono text-slate-200">computeReserveRoot</code>, <code className="font-mono text-slate-200">computeGrantKey</code>, and <code className="font-mono text-slate-200">computeDisclosureTag</code> and verifies EVERY historical epoch against on-chain <code className="font-mono text-slate-200">epochRoots[epoch]</code> &amp; <code className="font-mono text-slate-200">auditorGrants</code>.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!priv || !pub) return;
-                        const matchingGrant =
-                          session?.grants.find((g) => g.targetEpoch === pub.lastAttestedEpoch) ??
-                          session?.grants[0];
-                        setVerifyLabel(matchingGrant?.auditorLabel ?? "finra-institutional-audit-2026");
-                        setVerifyEpoch(pub.lastAttestedEpoch || "1");
-                        setVerifyBalances([...priv.custodianBalancesUsd]);
-                        setVerifyLiabilities(priv.totalLiabilitiesUsd);
-                        setVerifySaltHex(priv.epochSaltHex);
-                        if (!session?.grants.some((g) => g.targetEpoch === pub.lastAttestedEpoch)) {
-                          setBanner({
-                            kind: "info",
-                            text: `Loaded Epoch #${pub.lastAttestedEpoch} private witness packet. Publish an Epoch #${pub.lastAttestedEpoch} disclosure grant on the left before verifying.`
-                          });
-                        }
-                      }}
-                      className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
-                    >
-                      Load Current Private Packet
-                    </button>
+                    <div className="flex flex-wrap gap-1.5">
+                      {localPacketEpochs.map((ep) => (
+                        <button
+                          key={ep}
+                          type="button"
+                          onClick={() => {
+                            const pkt = localEpochPackets[ep];
+                            if (!pkt) return;
+                            const matchingGrant = session?.grants.find((g) => g.targetEpoch === ep);
+                            if (matchingGrant) setVerifyLabel(matchingGrant.auditorLabel);
+                            setVerifyEpoch(pkt.epoch);
+                            setVerifyBalances([...pkt.custodianBalancesUsd]);
+                            setVerifyLiabilities(pkt.totalLiabilitiesUsd);
+                            setVerifySaltHex(pkt.epochSaltHex);
+                          }}
+                          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                        >
+                          Load Epoch #{ep} Vault Packet
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <form onSubmit={handleVerifyPacket} className="space-y-3">
@@ -1151,7 +1309,7 @@ export default function App() {
                         />
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-[11px] text-slate-400">Epoch</span>
+                        <span className="mb-1 block text-[11px] text-slate-400">Historical or Latest Epoch</span>
                         <input
                           type="number"
                           value={verifyEpoch}
@@ -1205,7 +1363,7 @@ export default function App() {
                       disabled={busyAction !== null}
                       className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
                     >
-                      Verify Disclosure Preimage Against Public Ledger
+                      Verify Disclosure Preimage Against On-Chain epochRoots &amp; auditorGrants
                     </button>
                   </form>
 
@@ -1229,9 +1387,10 @@ export default function App() {
                       </div>
                       <div className="space-y-1 font-mono text-[11px] text-slate-300">
                         <div>Grant on Ledger: {String(verification.grantOnLedger).toUpperCase()}</div>
-                        <div>Latest Root Match: {String(verification.rootMatchesLatest).toUpperCase()}</div>
+                        <div>Epoch #{verification.targetEpoch} Root Match: {String(verification.rootMatchesEpoch).toUpperCase()}</div>
+                        <div>Disclosure Tag Hash Match: {String(verification.tagMatchesLedger).toUpperCase()}</div>
                         <div>Recomputed Root: {shortHex(verification.recomputedRoot, 18, 12)}</div>
-                        <div>Ledger Root: {shortHex(verification.ledgerRootHex, 18, 12)}</div>
+                        <div>On-Chain epochRoots[{verification.targetEpoch}]: {shortHex(verification.ledgerEpochRootHex ?? "missing", 18, 12)}</div>
                       </div>
                     </div>
                   )}
@@ -1255,10 +1414,10 @@ export default function App() {
                     </div>
                   </div>
                   <button
-                    onClick={downloadPreprodBundle}
+                    onClick={downloadArtifactManifest}
                     className="rounded-lg border border-indigo-500/40 bg-indigo-500/15 px-3.5 py-2 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/25"
                   >
-                    Export Preprod Bundle JSON
+                    Export Midnight Artifact Manifest JSON
                   </button>
                 </div>
 

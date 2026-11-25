@@ -11,13 +11,13 @@ const _descriptor_3 = new __compactRuntime.CompactTypeUnsignedInteger(65535n, 2)
 
 const _descriptor_4 = new __compactRuntime.CompactTypeVector(4, _descriptor_1);
 
-const _descriptor_5 = new __compactRuntime.CompactTypeVector(4, _descriptor_0);
+const _descriptor_5 = new __compactRuntime.CompactTypeVector(3, _descriptor_0);
 
-const _descriptor_6 = new __compactRuntime.CompactTypeVector(3, _descriptor_0);
+const _descriptor_6 = new __compactRuntime.CompactTypeVector(4, _descriptor_0);
 
 const _descriptor_7 = new __compactRuntime.CompactTypeVector(2, _descriptor_0);
 
-const _descriptor_8 = new __compactRuntime.CompactTypeVector(7, _descriptor_0);
+const _descriptor_8 = new __compactRuntime.CompactTypeVector(9, _descriptor_0);
 
 class _Either_0 {
   alignment() {
@@ -132,9 +132,6 @@ export class Contract {
     if (typeof(witnesses_0.getEpochSalt) !== 'function') {
       throw new __compactRuntime.CompactError('first (witnesses) argument to Contract constructor does not contain a function-valued field named getEpochSalt');
     }
-    if (typeof(witnesses_0.getAuditorSecretTag) !== 'function') {
-      throw new __compactRuntime.CompactError('first (witnesses) argument to Contract constructor does not contain a function-valued field named getAuditorSecretTag');
-    }
     this.witnesses = witnesses_0;
     this.circuits = {
       async deriveEntityCommitment(context, ...args_1) {
@@ -149,6 +146,9 @@ export class Contract {
       async computeGrantKey(context, ...args_1) {
         return { result: pureCircuits.computeGrantKey(...args_1), context };
       },
+      async computeDisclosureTag(context, ...args_1) {
+        return { result: pureCircuits.computeDisclosureTag(...args_1), context };
+      },
       attestSolvency: async (...args_1) => {
         if (args_1.length !== 1) {
           throw new __compactRuntime.CompactError(`attestSolvency: expected 1 argument (as invoked from Typescript), received ${args_1.length}`);
@@ -157,7 +157,7 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('attestSolvency',
                                      'argument 1 (as invoked from Typescript)',
-                                     'zero_covenant.compact line 79 char 1',
+                                     'zero_covenant.compact line 101 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
@@ -183,21 +183,21 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('grantAuditorDisclosure',
                                      'argument 1 (as invoked from Typescript)',
-                                     'zero_covenant.compact line 116 char 1',
+                                     'zero_covenant.compact line 142 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(auditorPk_0.buffer instanceof ArrayBuffer && auditorPk_0.BYTES_PER_ELEMENT === 1 && auditorPk_0.length === 32)) {
           __compactRuntime.typeError('grantAuditorDisclosure',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'zero_covenant.compact line 116 char 1',
+                                     'zero_covenant.compact line 142 char 1',
                                      'Bytes<32>',
                                      auditorPk_0)
         }
         if (!(typeof(targetEpoch_0) === 'bigint' && targetEpoch_0 >= 0n && targetEpoch_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('grantAuditorDisclosure',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'zero_covenant.compact line 116 char 1',
+                                     'zero_covenant.compact line 142 char 1',
                                      'Uint<0..18446744073709551616>',
                                      targetEpoch_0)
         }
@@ -229,21 +229,21 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('tightenCovenantPolicy',
                                      'argument 1 (as invoked from Typescript)',
-                                     'zero_covenant.compact line 129 char 1',
+                                     'zero_covenant.compact line 157 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(newMinRatioBps_0) === 'bigint' && newMinRatioBps_0 >= 0n && newMinRatioBps_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('tightenCovenantPolicy',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'zero_covenant.compact line 129 char 1',
+                                     'zero_covenant.compact line 157 char 1',
                                      'Uint<0..18446744073709551616>',
                                      newMinRatioBps_0)
         }
         if (!(typeof(newMaxSingleBps_0) === 'bigint' && newMaxSingleBps_0 >= 0n && newMaxSingleBps_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('tightenCovenantPolicy',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'zero_covenant.compact line 129 char 1',
+                                     'zero_covenant.compact line 157 char 1',
                                      'Uint<0..18446744073709551616>',
                                      newMaxSingleBps_0)
         }
@@ -299,19 +299,20 @@ export class Contract {
     if (!(typeof(initialMinRatioBps_0) === 'bigint' && initialMinRatioBps_0 >= 0n && initialMinRatioBps_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('Contract state constructor',
                                  'argument 1 (argument 2 as invoked from Typescript)',
-                                 'zero_covenant.compact line 66 char 1',
+                                 'zero_covenant.compact line 86 char 1',
                                  'Uint<0..18446744073709551616>',
                                  initialMinRatioBps_0)
     }
     if (!(typeof(initialMaxSingleBps_0) === 'bigint' && initialMaxSingleBps_0 >= 0n && initialMaxSingleBps_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('Contract state constructor',
                                  'argument 2 (argument 3 as invoked from Typescript)',
-                                 'zero_covenant.compact line 66 char 1',
+                                 'zero_covenant.compact line 86 char 1',
                                  'Uint<0..18446744073709551616>',
                                  initialMaxSingleBps_0)
     }
     const state_0 = new __compactRuntime.ContractState();
     let stateValue_0 = __compactRuntime.StateValue.newArray();
+    stateValue_0 = stateValue_0.arrayPush(__compactRuntime.StateValue.newNull());
     stateValue_0 = stateValue_0.arrayPush(__compactRuntime.StateValue.newNull());
     stateValue_0 = stateValue_0.arrayPush(__compactRuntime.StateValue.newNull());
     stateValue_0 = stateValue_0.arrayPush(__compactRuntime.StateValue.newNull());
@@ -435,12 +436,23 @@ export class Contract {
                                                           new __compactRuntime.StateMap()
                                                         ).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
-    __compactRuntime.assert(initialMinRatioBps_0 >= 10000n,
+    __compactRuntime.queryLedgerState(context,
+                                      partialProofData,
+                                      [
+                                       { push: { storage: false,
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(10n),
+                                                                                              alignment: _descriptor_15.alignment() }).encode() } },
+                                       { push: { storage: true,
+                                                 value: __compactRuntime.StateValue.newMap(
+                                                          new __compactRuntime.StateMap()
+                                                        ).encode() } },
+                                       { ins: { cached: false, n: 1 } }]);
+    const initMin_0 = initialMinRatioBps_0;
+    const initMax_0 = initialMaxSingleBps_0;
+    __compactRuntime.assert(initMin_0 >= 10000n,
                             'Minimum solvency ratio must be >= 10000 bps (100%)');
-    __compactRuntime.assert(initialMaxSingleBps_0 >= 1000n
-                            &&
-                            initialMaxSingleBps_0 <= 10000n,
-                            'Concentration cap must be 1000..10000 bps');
+    __compactRuntime.assert(initMax_0 >= 2500n && initMax_0 <= 10000n,
+                            'Concentration cap must be 2500..10000 bps for 4 custodians');
     const sk_0 = this._localDeskSecret_0(context, partialProofData);
     const tmp_0 = this._deriveEntityCommitment_0(sk_0);
     __compactRuntime.queryLedgerState(context,
@@ -460,7 +472,7 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(3n),
                                                                                               alignment: _descriptor_15.alignment() }).encode() } },
                                        { push: { storage: true,
-                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(initialMinRatioBps_0),
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(initMin_0),
                                                                                               alignment: _descriptor_1.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
     __compactRuntime.queryLedgerState(context,
@@ -470,7 +482,7 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(4n),
                                                                                               alignment: _descriptor_15.alignment() }).encode() } },
                                        { push: { storage: true,
-                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(initialMaxSingleBps_0),
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(initMax_0),
                                                                                               alignment: _descriptor_1.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
     __compactRuntime.queryLedgerState(context,
@@ -540,7 +552,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('localDeskSecret',
                                  'return value',
-                                 'zero_covenant.compact line 20 char 1',
+                                 'zero_covenant.compact line 21 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -557,7 +569,7 @@ export class Contract {
     if (!(Array.isArray(result_0) && result_0.length === 4 && result_0.every((t) => typeof(t) === 'bigint' && t >= 0n && t <= 18446744073709551615n))) {
       __compactRuntime.typeError('getCustodianBalances',
                                  'return value',
-                                 'zero_covenant.compact line 21 char 1',
+                                 'zero_covenant.compact line 22 char 1',
                                  'Vector<4, Uint<0..18446744073709551616>>',
                                  result_0)
     }
@@ -574,7 +586,7 @@ export class Contract {
     if (!(typeof(result_0) === 'bigint' && result_0 >= 0n && result_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('getTotalLiabilities',
                                  'return value',
-                                 'zero_covenant.compact line 22 char 1',
+                                 'zero_covenant.compact line 23 char 1',
                                  'Uint<0..18446744073709551616>',
                                  result_0)
     }
@@ -591,25 +603,6 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('getEpochSalt',
                                  'return value',
-                                 'zero_covenant.compact line 23 char 1',
-                                 'Bytes<32>',
-                                 result_0)
-    }
-    partialProofData.privateTranscriptOutputs.push({
-      value: _descriptor_0.toValue(result_0),
-      alignment: _descriptor_0.alignment()
-    });
-    return result_0;
-  }
-  _getAuditorSecretTag_0(context, partialProofData, auditorPk_0, epochVal_0) {
-    const witnessContext_0 = __compactRuntime.createWitnessContext(ledger(context.callContext.currentQueryContext.state), context.callContext.currentPrivateState, context.callContext.currentQueryContext.address);
-    const [nextPrivateState_0, result_0] = this.witnesses.getAuditorSecretTag(witnessContext_0,
-                                                                              auditorPk_0,
-                                                                              epochVal_0);
-    context.callContext.currentPrivateState = nextPrivateState_0;
-    if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
-      __compactRuntime.typeError('getAuditorSecretTag',
-                                 'return value',
                                  'zero_covenant.compact line 24 char 1',
                                  'Bytes<32>',
                                  result_0)
@@ -624,39 +617,56 @@ export class Contract {
     return this._persistentHash_0([new Uint8Array([122, 99, 58, 101, 110, 116, 105, 116, 121, 58, 118, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    sk_0]);
   }
-  _computeReserveRoot_0(b0_0, b1_0, b2_0, b3_0, liabilities_0, salt_0) {
-    return this._persistentHash_1([new Uint8Array([122, 99, 58, 114, 111, 111, 116, 58, 118, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-                                   __compactRuntime.convertBigintToBytes(32,
-                                                                         b0_0,
-                                                                         'zero_covenant.compact line 40 char 5'),
-                                   __compactRuntime.convertBigintToBytes(32,
-                                                                         b1_0,
-                                                                         'zero_covenant.compact line 41 char 5'),
-                                   __compactRuntime.convertBigintToBytes(32,
-                                                                         b2_0,
-                                                                         'zero_covenant.compact line 42 char 5'),
-                                   __compactRuntime.convertBigintToBytes(32,
-                                                                         b3_0,
-                                                                         'zero_covenant.compact line 43 char 5'),
-                                   __compactRuntime.convertBigintToBytes(32,
-                                                                         liabilities_0,
-                                                                         'zero_covenant.compact line 44 char 5'),
-                                   salt_0]);
-  }
-  _computeNullifier_0(sk_0, epochVal_0, salt_0) {
-    return this._persistentHash_2([new Uint8Array([122, 99, 58, 110, 117, 108, 108, 105, 102, 105, 101, 114, 58, 118, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-                                   sk_0,
+  _computeReserveRoot_0(entityCommit_0,
+                        epochVal_0,
+                        b0_0,
+                        b1_0,
+                        b2_0,
+                        b3_0,
+                        liabilities_0,
+                        salt_0)
+  {
+    return this._persistentHash_1([new Uint8Array([122, 99, 58, 114, 111, 111, 116, 58, 118, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                                   entityCommit_0,
                                    __compactRuntime.convertBigintToBytes(32,
                                                                          epochVal_0,
-                                                                         'zero_covenant.compact line 53 char 5'),
+                                                                         'zero_covenant.compact line 43 char 5'),
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         b0_0,
+                                                                         'zero_covenant.compact line 44 char 5'),
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         b1_0,
+                                                                         'zero_covenant.compact line 45 char 5'),
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         b2_0,
+                                                                         'zero_covenant.compact line 46 char 5'),
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         b3_0,
+                                                                         'zero_covenant.compact line 47 char 5'),
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         liabilities_0,
+                                                                         'zero_covenant.compact line 48 char 5'),
+                                   salt_0]);
+  }
+  _computeNullifier_0(sk_0, salt_0) {
+    return this._persistentHash_2([new Uint8Array([122, 99, 58, 110, 117, 108, 108, 105, 102, 105, 101, 114, 58, 118, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                                   sk_0,
                                    salt_0]);
   }
   _computeGrantKey_0(auditorPk_0, targetEpoch_0) {
-    return this._persistentHash_3([new Uint8Array([122, 99, 58, 103, 114, 97, 110, 116, 58, 118, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    return this._persistentHash_2([new Uint8Array([122, 99, 58, 103, 114, 97, 110, 116, 58, 118, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    auditorPk_0,
                                    __compactRuntime.convertBigintToBytes(32,
                                                                          targetEpoch_0,
-                                                                         'zero_covenant.compact line 62 char 5')]);
+                                                                         'zero_covenant.compact line 67 char 5')]);
+  }
+  _computeDisclosureTag_0(epochRoot_0, auditorPk_0, targetEpoch_0) {
+    return this._persistentHash_3([new Uint8Array([122, 99, 58, 100, 105, 115, 99, 108, 111, 115, 117, 114, 101, 58, 118, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                                   epochRoot_0,
+                                   auditorPk_0,
+                                   __compactRuntime.convertBigintToBytes(32,
+                                                                         targetEpoch_0,
+                                                                         'zero_covenant.compact line 82 char 5')]);
   }
   async _attestSolvency_0(context, partialProofData) {
     const sk_0 = this._localDeskSecret_0(context, partialProofData);
@@ -680,6 +690,8 @@ export class Contract {
     const totalAssets_0 = b_0[0] + b_0[1] + b_0[2] + b_0[3];
     __compactRuntime.assert(totalAssets_0 > 0n,
                             'Total reserves must be strictly positive');
+    __compactRuntime.assert(liabilities_0 > 0n,
+                            'Total liabilities must be strictly positive');
     let t_0;
     __compactRuntime.assert((t_0 = totalAssets_0 * 10000n,
                              t_0
@@ -737,7 +749,7 @@ export class Contract {
                                                                                                              alignment: _descriptor_15.alignment() } }] } },
                                                                                   { popeq: { cached: true,
                                                                                              result: undefined } }]).value);
-    const nul_0 = this._computeNullifier_0(sk_0, curEpoch_0, salt_0);
+    const nul_0 = this._computeNullifier_0(sk_0, salt_0);
     __compactRuntime.assert(!_descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
                                                                                        partialProofData,
                                                                                        [
@@ -771,12 +783,42 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newNull().encode() } },
                                        { ins: { cached: false, n: 1 } },
                                        { ins: { cached: true, n: 1 } }]);
-    const root_0 = this._computeReserveRoot_0(b_0[0],
+    const root_0 = this._computeReserveRoot_0(_descriptor_0.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                                        partialProofData,
+                                                                                                        [
+                                                                                                         { dup: { n: 0 } },
+                                                                                                         { idx: { cached: false,
+                                                                                                                  pushPath: false,
+                                                                                                                  path: [
+                                                                                                                         { tag: 'value',
+                                                                                                                           value: { value: _descriptor_15.toValue(2n),
+                                                                                                                                    alignment: _descriptor_15.alignment() } }] } },
+                                                                                                         { popeq: { cached: false,
+                                                                                                                    result: undefined } }]).value),
+                                              curEpoch_0,
+                                              b_0[0],
                                               b_0[1],
                                               b_0[2],
                                               b_0[3],
                                               liabilities_0,
                                               salt_0);
+    __compactRuntime.queryLedgerState(context,
+                                      partialProofData,
+                                      [
+                                       { idx: { cached: false,
+                                                pushPath: true,
+                                                path: [
+                                                       { tag: 'value',
+                                                         value: { value: _descriptor_15.toValue(9n),
+                                                                  alignment: _descriptor_15.alignment() } }] } },
+                                       { push: { storage: false,
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(curEpoch_0),
+                                                                                              alignment: _descriptor_1.alignment() }).encode() } },
+                                       { push: { storage: true,
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_0.toValue(root_0),
+                                                                                              alignment: _descriptor_0.alignment() }).encode() } },
+                                       { ins: { cached: false, n: 1 } },
+                                       { ins: { cached: true, n: 1 } }]);
     __compactRuntime.queryLedgerState(context,
                                       partialProofData,
                                       [
@@ -861,27 +903,65 @@ export class Contract {
                                                                                                                 result: undefined } }]).value),
                                           this._deriveEntityCommitment_0(sk_0)),
                             'Unauthorized desk secret key');
-    const gtZero_0 = targetEpoch_0 > 0n;
-    const lteLast_0 = targetEpoch_0
-                      <=
-                      _descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
-                                                                                partialProofData,
-                                                                                [
-                                                                                 { dup: { n: 0 } },
-                                                                                 { idx: { cached: false,
-                                                                                          pushPath: false,
-                                                                                          path: [
-                                                                                                 { tag: 'value',
-                                                                                                   value: { value: _descriptor_15.toValue(7n),
-                                                                                                            alignment: _descriptor_15.alignment() } }] } },
-                                                                                 { popeq: { cached: false,
-                                                                                            result: undefined } }]).value);
-    __compactRuntime.assert(gtZero_0 && lteLast_0, 'Invalid target epoch');
-    const grantKey_0 = this._computeGrantKey_0(auditorPk_0, targetEpoch_0);
-    const tag_0 = this._getAuditorSecretTag_0(context,
-                                              partialProofData,
-                                              auditorPk_0,
-                                              targetEpoch_0);
+    const epochDisclosed_0 = targetEpoch_0;
+    const auditorDisclosed_0 = auditorPk_0;
+    __compactRuntime.assert(epochDisclosed_0 > 0n
+                            &&
+                            epochDisclosed_0
+                            <=
+                            _descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                      partialProofData,
+                                                                                      [
+                                                                                       { dup: { n: 0 } },
+                                                                                       { idx: { cached: false,
+                                                                                                pushPath: false,
+                                                                                                path: [
+                                                                                                       { tag: 'value',
+                                                                                                         value: { value: _descriptor_15.toValue(7n),
+                                                                                                                  alignment: _descriptor_15.alignment() } }] } },
+                                                                                       { popeq: { cached: false,
+                                                                                                  result: undefined } }]).value),
+                            'Invalid target epoch');
+    __compactRuntime.assert(_descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                      partialProofData,
+                                                                                      [
+                                                                                       { dup: { n: 0 } },
+                                                                                       { idx: { cached: false,
+                                                                                                pushPath: false,
+                                                                                                path: [
+                                                                                                       { tag: 'value',
+                                                                                                         value: { value: _descriptor_15.toValue(9n),
+                                                                                                                  alignment: _descriptor_15.alignment() } }] } },
+                                                                                       { push: { storage: false,
+                                                                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(epochDisclosed_0),
+                                                                                                                                              alignment: _descriptor_1.alignment() }).encode() } },
+                                                                                       'member',
+                                                                                       { popeq: { cached: true,
+                                                                                                  result: undefined } }]).value),
+                            'Target epoch root not found');
+    const epochRoot_0 = _descriptor_0.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                  partialProofData,
+                                                                                  [
+                                                                                   { dup: { n: 0 } },
+                                                                                   { idx: { cached: false,
+                                                                                            pushPath: false,
+                                                                                            path: [
+                                                                                                   { tag: 'value',
+                                                                                                     value: { value: _descriptor_15.toValue(9n),
+                                                                                                              alignment: _descriptor_15.alignment() } }] } },
+                                                                                   { idx: { cached: false,
+                                                                                            pushPath: false,
+                                                                                            path: [
+                                                                                                   { tag: 'value',
+                                                                                                     value: { value: _descriptor_1.toValue(epochDisclosed_0),
+                                                                                                              alignment: _descriptor_1.alignment() } }] } },
+                                                                                   { popeq: { cached: false,
+                                                                                              result: undefined } }]).value);
+    const grantKey_0 = this._computeGrantKey_0(auditorDisclosed_0,
+                                               epochDisclosed_0);
+    const tag_0 = this._computeDisclosureTag_0(epochRoot_0,
+                                               auditorDisclosed_0,
+                                               epochDisclosed_0);
     __compactRuntime.queryLedgerState(context,
                                       partialProofData,
                                       [
@@ -889,7 +969,7 @@ export class Contract {
                                                 pushPath: true,
                                                 path: [
                                                        { tag: 'value',
-                                                         value: { value: _descriptor_15.toValue(9n),
+                                                         value: { value: _descriptor_15.toValue(10n),
                                                                   alignment: _descriptor_15.alignment() } }] } },
                                        { push: { storage: false,
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_0.toValue(grantKey_0),
@@ -921,12 +1001,42 @@ export class Contract {
                                                                                                                 result: undefined } }]).value),
                                           this._deriveEntityCommitment_0(sk_0)),
                             'Unauthorized desk secret key');
-    __compactRuntime.assert(newMinRatioBps_0 >= 10000n,
+    const nextMin_0 = newMinRatioBps_0;
+    const nextMax_0 = newMaxSingleBps_0;
+    __compactRuntime.assert(nextMin_0 >= 10000n,
                             'Solvency ratio must be >= 10000 bps');
-    __compactRuntime.assert(newMaxSingleBps_0 >= 1000n
-                            &&
-                            newMaxSingleBps_0 <= 10000n,
-                            'Concentration cap must be 1000..10000 bps');
+    __compactRuntime.assert(nextMax_0 >= 2500n && nextMax_0 <= 10000n,
+                            'Concentration cap must be 2500..10000 bps for 4 custodians');
+    __compactRuntime.assert(nextMin_0
+                            >=
+                            _descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                      partialProofData,
+                                                                                      [
+                                                                                       { dup: { n: 0 } },
+                                                                                       { idx: { cached: false,
+                                                                                                pushPath: false,
+                                                                                                path: [
+                                                                                                       { tag: 'value',
+                                                                                                         value: { value: _descriptor_15.toValue(3n),
+                                                                                                                  alignment: _descriptor_15.alignment() } }] } },
+                                                                                       { popeq: { cached: false,
+                                                                                                  result: undefined } }]).value),
+                            'Covenant solvency ratio can only tighten');
+    __compactRuntime.assert(nextMax_0
+                            <=
+                            _descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                                      partialProofData,
+                                                                                      [
+                                                                                       { dup: { n: 0 } },
+                                                                                       { idx: { cached: false,
+                                                                                                pushPath: false,
+                                                                                                path: [
+                                                                                                       { tag: 'value',
+                                                                                                         value: { value: _descriptor_15.toValue(4n),
+                                                                                                                  alignment: _descriptor_15.alignment() } }] } },
+                                                                                       { popeq: { cached: false,
+                                                                                                  result: undefined } }]).value),
+                            'Covenant concentration cap can only tighten');
     __compactRuntime.queryLedgerState(context,
                                       partialProofData,
                                       [
@@ -934,7 +1044,7 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(3n),
                                                                                               alignment: _descriptor_15.alignment() }).encode() } },
                                        { push: { storage: true,
-                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(newMinRatioBps_0),
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(nextMin_0),
                                                                                               alignment: _descriptor_1.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
     __compactRuntime.queryLedgerState(context,
@@ -944,8 +1054,18 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(4n),
                                                                                               alignment: _descriptor_15.alignment() }).encode() } },
                                        { push: { storage: true,
-                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(newMaxSingleBps_0),
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(nextMax_0),
                                                                                               alignment: _descriptor_1.alignment() }).encode() } },
+                                       { ins: { cached: false, n: 1 } }]);
+    __compactRuntime.queryLedgerState(context,
+                                      partialProofData,
+                                      [
+                                       { push: { storage: false,
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_15.toValue(6n),
+                                                                                              alignment: _descriptor_15.alignment() }).encode() } },
+                                       { push: { storage: true,
+                                                 value: __compactRuntime.StateValue.newCell({ value: _descriptor_2.toValue(false),
+                                                                                              alignment: _descriptor_2.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
     return [];
   }
@@ -1166,7 +1286,7 @@ export function ledger(stateOrChargedState) {
         return self_0.asMap().keys().map((elem) => _descriptor_0.fromValue(elem.value))[Symbol.iterator]();
       }
     },
-    auditorGrants: {
+    epochRoots: {
       isEmpty(...args_0) {
         if (args_0.length !== 0) {
           throw new __compactRuntime.CompactError(`isEmpty: expected 0 arguments, received ${args_0.length}`);
@@ -1212,11 +1332,11 @@ export function ledger(stateOrChargedState) {
           throw new __compactRuntime.CompactError(`member: expected 1 argument, received ${args_0.length}`);
         }
         const key_0 = args_0[0];
-        if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
+        if (!(typeof(key_0) === 'bigint' && key_0 >= 0n && key_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('member',
                                      'argument 1',
                                      'zero_covenant.compact line 18 char 1',
-                                     'Bytes<32>',
+                                     'Uint<0..18446744073709551616>',
                                      key_0)
         }
         return _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
@@ -1230,8 +1350,8 @@ export function ledger(stateOrChargedState) {
                                                                                             value: { value: _descriptor_15.toValue(9n),
                                                                                                      alignment: _descriptor_15.alignment() } }] } },
                                                                           { push: { storage: false,
-                                                                                    value: __compactRuntime.StateValue.newCell({ value: _descriptor_0.toValue(key_0),
-                                                                                                                                 alignment: _descriptor_0.alignment() }).encode() } },
+                                                                                    value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(key_0),
+                                                                                                                                 alignment: _descriptor_1.alignment() }).encode() } },
                                                                           'member',
                                                                           { popeq: { cached: true,
                                                                                      result: undefined } }]).value);
@@ -1241,11 +1361,11 @@ export function ledger(stateOrChargedState) {
           throw new __compactRuntime.CompactError(`lookup: expected 1 argument, received ${args_0.length}`);
         }
         const key_0 = args_0[0];
-        if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
+        if (!(typeof(key_0) === 'bigint' && key_0 >= 0n && key_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('lookup',
                                      'argument 1',
                                      'zero_covenant.compact line 18 char 1',
-                                     'Bytes<32>',
+                                     'Uint<0..18446744073709551616>',
                                      key_0)
         }
         return _descriptor_0.fromValue(__compactRuntime.queryLedgerState(context,
@@ -1262,6 +1382,115 @@ export function ledger(stateOrChargedState) {
                                                                                    pushPath: false,
                                                                                    path: [
                                                                                           { tag: 'value',
+                                                                                            value: { value: _descriptor_1.toValue(key_0),
+                                                                                                     alignment: _descriptor_1.alignment() } }] } },
+                                                                          { popeq: { cached: false,
+                                                                                     result: undefined } }]).value);
+      },
+      [Symbol.iterator](...args_0) {
+        if (args_0.length !== 0) {
+          throw new __compactRuntime.CompactError(`iter: expected 0 arguments, received ${args_0.length}`);
+        }
+        const self_0 = state.asArray()[9];
+        return self_0.asMap().keys().map(  (key) => {    const value = self_0.asMap().get(key).asCell();    return [      _descriptor_1.fromValue(key.value),      _descriptor_0.fromValue(value.value)    ];  })[Symbol.iterator]();
+      }
+    },
+    auditorGrants: {
+      isEmpty(...args_0) {
+        if (args_0.length !== 0) {
+          throw new __compactRuntime.CompactError(`isEmpty: expected 0 arguments, received ${args_0.length}`);
+        }
+        return _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                         partialProofData,
+                                                                         [
+                                                                          { dup: { n: 0 } },
+                                                                          { idx: { cached: false,
+                                                                                   pushPath: false,
+                                                                                   path: [
+                                                                                          { tag: 'value',
+                                                                                            value: { value: _descriptor_15.toValue(10n),
+                                                                                                     alignment: _descriptor_15.alignment() } }] } },
+                                                                          'size',
+                                                                          { push: { storage: false,
+                                                                                    value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(0n),
+                                                                                                                                 alignment: _descriptor_1.alignment() }).encode() } },
+                                                                          'eq',
+                                                                          { popeq: { cached: true,
+                                                                                     result: undefined } }]).value);
+      },
+      size(...args_0) {
+        if (args_0.length !== 0) {
+          throw new __compactRuntime.CompactError(`size: expected 0 arguments, received ${args_0.length}`);
+        }
+        return _descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                         partialProofData,
+                                                                         [
+                                                                          { dup: { n: 0 } },
+                                                                          { idx: { cached: false,
+                                                                                   pushPath: false,
+                                                                                   path: [
+                                                                                          { tag: 'value',
+                                                                                            value: { value: _descriptor_15.toValue(10n),
+                                                                                                     alignment: _descriptor_15.alignment() } }] } },
+                                                                          'size',
+                                                                          { popeq: { cached: true,
+                                                                                     result: undefined } }]).value);
+      },
+      member(...args_0) {
+        if (args_0.length !== 1) {
+          throw new __compactRuntime.CompactError(`member: expected 1 argument, received ${args_0.length}`);
+        }
+        const key_0 = args_0[0];
+        if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
+          __compactRuntime.typeError('member',
+                                     'argument 1',
+                                     'zero_covenant.compact line 19 char 1',
+                                     'Bytes<32>',
+                                     key_0)
+        }
+        return _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                         partialProofData,
+                                                                         [
+                                                                          { dup: { n: 0 } },
+                                                                          { idx: { cached: false,
+                                                                                   pushPath: false,
+                                                                                   path: [
+                                                                                          { tag: 'value',
+                                                                                            value: { value: _descriptor_15.toValue(10n),
+                                                                                                     alignment: _descriptor_15.alignment() } }] } },
+                                                                          { push: { storage: false,
+                                                                                    value: __compactRuntime.StateValue.newCell({ value: _descriptor_0.toValue(key_0),
+                                                                                                                                 alignment: _descriptor_0.alignment() }).encode() } },
+                                                                          'member',
+                                                                          { popeq: { cached: true,
+                                                                                     result: undefined } }]).value);
+      },
+      lookup(...args_0) {
+        if (args_0.length !== 1) {
+          throw new __compactRuntime.CompactError(`lookup: expected 1 argument, received ${args_0.length}`);
+        }
+        const key_0 = args_0[0];
+        if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
+          __compactRuntime.typeError('lookup',
+                                     'argument 1',
+                                     'zero_covenant.compact line 19 char 1',
+                                     'Bytes<32>',
+                                     key_0)
+        }
+        return _descriptor_0.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                         partialProofData,
+                                                                         [
+                                                                          { dup: { n: 0 } },
+                                                                          { idx: { cached: false,
+                                                                                   pushPath: false,
+                                                                                   path: [
+                                                                                          { tag: 'value',
+                                                                                            value: { value: _descriptor_15.toValue(10n),
+                                                                                                     alignment: _descriptor_15.alignment() } }] } },
+                                                                          { idx: { cached: false,
+                                                                                   pushPath: false,
+                                                                                   path: [
+                                                                                          { tag: 'value',
                                                                                             value: { value: _descriptor_0.toValue(key_0),
                                                                                                      alignment: _descriptor_0.alignment() } }] } },
                                                                           { popeq: { cached: false,
@@ -1271,7 +1500,7 @@ export function ledger(stateOrChargedState) {
         if (args_0.length !== 0) {
           throw new __compactRuntime.CompactError(`iter: expected 0 arguments, received ${args_0.length}`);
         }
-        const self_0 = state.asArray()[9];
+        const self_0 = state.asArray()[10];
         return self_0.asMap().keys().map(  (key) => {    const value = self_0.asMap().get(key).asCell();    return [      _descriptor_0.fromValue(key.value),      _descriptor_0.fromValue(value.value)    ];  })[Symbol.iterator]();
       }
     }
@@ -1284,8 +1513,7 @@ const _dummyContract = new Contract({
   localDeskSecret: (...args) => undefined,
   getCustodianBalances: (...args) => undefined,
   getTotalLiabilities: (...args) => undefined,
-  getEpochSalt: (...args) => undefined,
-  getAuditorSecretTag: (...args) => undefined
+  getEpochSalt: (...args) => undefined
 });
 export const pureCircuits = {
   deriveEntityCommitment: (...args_0) => {
@@ -1303,58 +1531,76 @@ export const pureCircuits = {
     return _dummyContract._deriveEntityCommitment_0(sk_0);
   },
   computeReserveRoot: (...args_0) => {
-    if (args_0.length !== 6) {
-      throw new __compactRuntime.CompactError(`computeReserveRoot: expected 6 arguments (as invoked from Typescript), received ${args_0.length}`);
+    if (args_0.length !== 8) {
+      throw new __compactRuntime.CompactError(`computeReserveRoot: expected 8 arguments (as invoked from Typescript), received ${args_0.length}`);
     }
-    const b0_0 = args_0[0];
-    const b1_0 = args_0[1];
-    const b2_0 = args_0[2];
-    const b3_0 = args_0[3];
-    const liabilities_0 = args_0[4];
-    const salt_0 = args_0[5];
-    if (!(typeof(b0_0) === 'bigint' && b0_0 >= 0n && b0_0 <= 18446744073709551615n)) {
+    const entityCommit_0 = args_0[0];
+    const epochVal_0 = args_0[1];
+    const b0_0 = args_0[2];
+    const b1_0 = args_0[3];
+    const b2_0 = args_0[4];
+    const b3_0 = args_0[5];
+    const liabilities_0 = args_0[6];
+    const salt_0 = args_0[7];
+    if (!(entityCommit_0.buffer instanceof ArrayBuffer && entityCommit_0.BYTES_PER_ELEMENT === 1 && entityCommit_0.length === 32)) {
       __compactRuntime.typeError('computeReserveRoot',
                                  'argument 1',
+                                 'zero_covenant.compact line 30 char 1',
+                                 'Bytes<32>',
+                                 entityCommit_0)
+    }
+    if (!(typeof(epochVal_0) === 'bigint' && epochVal_0 >= 0n && epochVal_0 <= 18446744073709551615n)) {
+      __compactRuntime.typeError('computeReserveRoot',
+                                 'argument 2',
+                                 'zero_covenant.compact line 30 char 1',
+                                 'Uint<0..18446744073709551616>',
+                                 epochVal_0)
+    }
+    if (!(typeof(b0_0) === 'bigint' && b0_0 >= 0n && b0_0 <= 18446744073709551615n)) {
+      __compactRuntime.typeError('computeReserveRoot',
+                                 'argument 3',
                                  'zero_covenant.compact line 30 char 1',
                                  'Uint<0..18446744073709551616>',
                                  b0_0)
     }
     if (!(typeof(b1_0) === 'bigint' && b1_0 >= 0n && b1_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('computeReserveRoot',
-                                 'argument 2',
+                                 'argument 4',
                                  'zero_covenant.compact line 30 char 1',
                                  'Uint<0..18446744073709551616>',
                                  b1_0)
     }
     if (!(typeof(b2_0) === 'bigint' && b2_0 >= 0n && b2_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('computeReserveRoot',
-                                 'argument 3',
+                                 'argument 5',
                                  'zero_covenant.compact line 30 char 1',
                                  'Uint<0..18446744073709551616>',
                                  b2_0)
     }
     if (!(typeof(b3_0) === 'bigint' && b3_0 >= 0n && b3_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('computeReserveRoot',
-                                 'argument 4',
+                                 'argument 6',
                                  'zero_covenant.compact line 30 char 1',
                                  'Uint<0..18446744073709551616>',
                                  b3_0)
     }
     if (!(typeof(liabilities_0) === 'bigint' && liabilities_0 >= 0n && liabilities_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('computeReserveRoot',
-                                 'argument 5',
+                                 'argument 7',
                                  'zero_covenant.compact line 30 char 1',
                                  'Uint<0..18446744073709551616>',
                                  liabilities_0)
     }
     if (!(salt_0.buffer instanceof ArrayBuffer && salt_0.BYTES_PER_ELEMENT === 1 && salt_0.length === 32)) {
       __compactRuntime.typeError('computeReserveRoot',
-                                 'argument 6',
+                                 'argument 8',
                                  'zero_covenant.compact line 30 char 1',
                                  'Bytes<32>',
                                  salt_0)
     }
-    return _dummyContract._computeReserveRoot_0(b0_0,
+    return _dummyContract._computeReserveRoot_0(entityCommit_0,
+                                                epochVal_0,
+                                                b0_0,
                                                 b1_0,
                                                 b2_0,
                                                 b3_0,
@@ -1362,34 +1608,26 @@ export const pureCircuits = {
                                                 salt_0);
   },
   computeNullifier: (...args_0) => {
-    if (args_0.length !== 3) {
-      throw new __compactRuntime.CompactError(`computeNullifier: expected 3 arguments (as invoked from Typescript), received ${args_0.length}`);
+    if (args_0.length !== 2) {
+      throw new __compactRuntime.CompactError(`computeNullifier: expected 2 arguments (as invoked from Typescript), received ${args_0.length}`);
     }
     const sk_0 = args_0[0];
-    const epochVal_0 = args_0[1];
-    const salt_0 = args_0[2];
+    const salt_0 = args_0[1];
     if (!(sk_0.buffer instanceof ArrayBuffer && sk_0.BYTES_PER_ELEMENT === 1 && sk_0.length === 32)) {
       __compactRuntime.typeError('computeNullifier',
                                  'argument 1',
-                                 'zero_covenant.compact line 49 char 1',
+                                 'zero_covenant.compact line 55 char 1',
                                  'Bytes<32>',
                                  sk_0)
     }
-    if (!(typeof(epochVal_0) === 'bigint' && epochVal_0 >= 0n && epochVal_0 <= 18446744073709551615n)) {
-      __compactRuntime.typeError('computeNullifier',
-                                 'argument 2',
-                                 'zero_covenant.compact line 49 char 1',
-                                 'Uint<0..18446744073709551616>',
-                                 epochVal_0)
-    }
     if (!(salt_0.buffer instanceof ArrayBuffer && salt_0.BYTES_PER_ELEMENT === 1 && salt_0.length === 32)) {
       __compactRuntime.typeError('computeNullifier',
-                                 'argument 3',
-                                 'zero_covenant.compact line 49 char 1',
+                                 'argument 2',
+                                 'zero_covenant.compact line 55 char 1',
                                  'Bytes<32>',
                                  salt_0)
     }
-    return _dummyContract._computeNullifier_0(sk_0, epochVal_0, salt_0);
+    return _dummyContract._computeNullifier_0(sk_0, salt_0);
   },
   computeGrantKey: (...args_0) => {
     if (args_0.length !== 2) {
@@ -1400,31 +1638,64 @@ export const pureCircuits = {
     if (!(auditorPk_0.buffer instanceof ArrayBuffer && auditorPk_0.BYTES_PER_ELEMENT === 1 && auditorPk_0.length === 32)) {
       __compactRuntime.typeError('computeGrantKey',
                                  'argument 1',
-                                 'zero_covenant.compact line 58 char 1',
+                                 'zero_covenant.compact line 63 char 1',
                                  'Bytes<32>',
                                  auditorPk_0)
     }
     if (!(typeof(targetEpoch_0) === 'bigint' && targetEpoch_0 >= 0n && targetEpoch_0 <= 18446744073709551615n)) {
       __compactRuntime.typeError('computeGrantKey',
                                  'argument 2',
-                                 'zero_covenant.compact line 58 char 1',
+                                 'zero_covenant.compact line 63 char 1',
                                  'Uint<0..18446744073709551616>',
                                  targetEpoch_0)
     }
     return _dummyContract._computeGrantKey_0(auditorPk_0, targetEpoch_0);
+  },
+  computeDisclosureTag: (...args_0) => {
+    if (args_0.length !== 3) {
+      throw new __compactRuntime.CompactError(`computeDisclosureTag: expected 3 arguments (as invoked from Typescript), received ${args_0.length}`);
+    }
+    const epochRoot_0 = args_0[0];
+    const auditorPk_0 = args_0[1];
+    const targetEpoch_0 = args_0[2];
+    if (!(epochRoot_0.buffer instanceof ArrayBuffer && epochRoot_0.BYTES_PER_ELEMENT === 1 && epochRoot_0.length === 32)) {
+      __compactRuntime.typeError('computeDisclosureTag',
+                                 'argument 1',
+                                 'zero_covenant.compact line 73 char 1',
+                                 'Bytes<32>',
+                                 epochRoot_0)
+    }
+    if (!(auditorPk_0.buffer instanceof ArrayBuffer && auditorPk_0.BYTES_PER_ELEMENT === 1 && auditorPk_0.length === 32)) {
+      __compactRuntime.typeError('computeDisclosureTag',
+                                 'argument 2',
+                                 'zero_covenant.compact line 73 char 1',
+                                 'Bytes<32>',
+                                 auditorPk_0)
+    }
+    if (!(typeof(targetEpoch_0) === 'bigint' && targetEpoch_0 >= 0n && targetEpoch_0 <= 18446744073709551615n)) {
+      __compactRuntime.typeError('computeDisclosureTag',
+                                 'argument 3',
+                                 'zero_covenant.compact line 73 char 1',
+                                 'Uint<0..18446744073709551616>',
+                                 targetEpoch_0)
+    }
+    return _dummyContract._computeDisclosureTag_0(epochRoot_0,
+                                                  auditorPk_0,
+                                                  targetEpoch_0);
   }
 };
 export const expectedVk = {
-  'attestSolvency': 'd6a304dd7e174852ad037b2bac2ae9457cde1ba53917a6dfa3d8378d3a7ae49c',
-  'grantAuditorDisclosure': 'bd18217e3c52ae1af5745b49e24056f431b6c0eaca7474d88ffdab15ac6294af',
-  'tightenCovenantPolicy': '4dad7e7a86ddb2599c52449dd47f7bec05b5705b87840f08f03f716a78dc5a1a',
+  'attestSolvency': 'afd59eec7ee13f1d860bd961c5bd2d9bd62f8be9b5af9329650bcc79973bc16e',
+  'grantAuditorDisclosure': '0f5e7b44bbeffd51e265b6db6228cda23e0d4af57db2b6dfdad2a1867bc633c0',
+  'tightenCovenantPolicy': 'd4b1f64d329816be5083b135fbd20f9915094d2fb8a3a98fd152e39cce69f3aa',
 };
 
 export const circuitSignatures = {
   'deriveEntityCommitment': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}], resultType: {tag: 'Bytes', length: 32}},
-  'computeReserveRoot': {pure: true, provable: false, argumentTypes: [{tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Bytes', length: 32}], resultType: {tag: 'Bytes', length: 32}},
-  'computeNullifier': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Bytes', length: 32}], resultType: {tag: 'Bytes', length: 32}},
+  'computeReserveRoot': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Bytes', length: 32}], resultType: {tag: 'Bytes', length: 32}},
+  'computeNullifier': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Bytes', length: 32}], resultType: {tag: 'Bytes', length: 32}},
   'computeGrantKey': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Uint', maxval: '18446744073709551615'}], resultType: {tag: 'Bytes', length: 32}},
+  'computeDisclosureTag': {pure: true, provable: false, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Bytes', length: 32}, {tag: 'Uint', maxval: '18446744073709551615'}], resultType: {tag: 'Bytes', length: 32}},
   'attestSolvency': {pure: false, provable: true, argumentTypes: [], resultType: {tag: 'Bytes', length: 32}},
   'grantAuditorDisclosure': {pure: false, provable: true, argumentTypes: [{tag: 'Bytes', length: 32}, {tag: 'Uint', maxval: '18446744073709551615'}], resultType: {tag: 'Bytes', length: 32}},
   'tightenCovenantPolicy': {pure: false, provable: true, argumentTypes: [{tag: 'Uint', maxval: '18446744073709551615'}, {tag: 'Uint', maxval: '18446744073709551615'}], resultType: {tag: 'Tuple', types: []}},

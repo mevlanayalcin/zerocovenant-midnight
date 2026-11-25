@@ -8,92 +8,92 @@
     "type": "directory",
     "contract-info.json": {
       "type": "file",
-      "size": 7155,
-      "hash": "9ab434c3af243598f1f825375160f930359b64f2269bd80ff3ce89a7d464d1b9"
+      "size": 7766,
+      "hash": "af27940102f095896ffd82c55116c0861d73ec09364f93e7cf09ea191a961231"
     }
   },
   "contract": {
     "type": "directory",
     "index.d.ts": {
       "type": "file",
-      "size": 5457,
-      "hash": "265dfc9a062e130ba9bc15211fcbcd8e121e90c6be23a23324c62bbb15b91fde"
+      "size": 6015,
+      "hash": "28501b5f893c6e5ecb96d9de2839dd9822c20742333b1e554189201d0cc68205"
     },
     "index.js": {
       "type": "file",
-      "size": 101924,
-      "hash": "a193d2732838469a6054dfa01605169b4b65743ebdc8761afe9fdb1799d09bb9"
+      "size": 125469,
+      "hash": "dc14898d4f95f9e6118bb0ec67da6a90489ca283985e8de33328f7df4014d629"
     },
     "index.js.map": {
       "type": "file",
-      "size": 4615,
-      "hash": "e6aaa8b7e383e6a1ec04f141d670020dc157deb8141ad91a91880745fe8e6aed"
+      "size": 5368,
+      "hash": "72292dfdf5a07643c3517288d3948c3eb47d4213e8a8ad6076891f3c00fae0ac"
     }
   },
   "zkir": {
     "type": "directory",
     "attestSolvency.bzkir": {
       "type": "file",
-      "size": 2629,
-      "hash": "c66047d53907a06b511d33761fc39d8b1be7b5fe6f557c9e590fb3ce67e8f4a2"
+      "size": 3013,
+      "hash": "0ad855b7eb149bc365c1c1a0ee292ee36ecf59da6d0c8580fd871fc9b9efbebb"
     },
     "attestSolvency.zkir": {
       "type": "file",
-      "size": 9789,
-      "hash": "8af07743e8a7697de377714f58d62dc41b68817f8622cdd4832f72adfcfd8b4d"
+      "size": 10915,
+      "hash": "2d18235958f620ec9b2d11de8c85e1bbfaa3b9bab92d7b30b7b32638a69c93cb"
     },
     "grantAuditorDisclosure.bzkir": {
       "type": "file",
-      "size": 1051,
-      "hash": "9093b03490bd5e2920634a7de73321298ec0d62c0c5609d0164bbc0baf2930bd"
+      "size": 1533,
+      "hash": "b5f4a2880ca7d41a5e9022726d0282680a759e5539ef06e7c310f0128d1eda77"
     },
     "grantAuditorDisclosure.zkir": {
       "type": "file",
-      "size": 4048,
-      "hash": "ccd6e85488af32248973c3f7e5d07bdc636d57ad0a612860f8662f99f6b44234"
+      "size": 5457,
+      "hash": "c200fef012ee5a05d6feb009b4f9cb77e93d5e8dabf7004ab0c434c5e933e9a5"
     },
     "tightenCovenantPolicy.bzkir": {
       "type": "file",
-      "size": 826,
-      "hash": "813f5d4547951fc987d76bd656a672a7f549df5f006cce062853ea7de39611a5"
+      "size": 1231,
+      "hash": "d3ba0dcba72944f1b10283665cf2f0a07a717b8046d4a1190d4e40b0d8ab85c1"
     },
     "tightenCovenantPolicy.zkir": {
       "type": "file",
-      "size": 2946,
-      "hash": "b9a45dbe82268ede9d57fa2f58cd89c453708d09233ea2225270aff7c74bbf8a"
+      "size": 4302,
+      "hash": "5a6d57762c12e27166370f2e8507ec0f57288be008523ed7497e5fe3882c5f25"
     }
   },
   "keys": {
     "type": "directory",
     "attestSolvency.prover": {
       "type": "file",
-      "size": 45095765,
-      "hash": "1cb71da6c80c54b5eb85681ba9ad87e7810e79e4d0432a874e5159aa96140a0f"
+      "size": 45096149,
+      "hash": "0617db7b8eb8a864defc46d4b934d740c61a920b427c249b571de23537919ac0"
     },
     "attestSolvency.verifier": {
       "type": "file",
       "size": 2121,
-      "hash": "d6a304dd7e174852ad037b2bac2ae9457cde1ba53917a6dfa3d8378d3a7ae49c"
+      "hash": "afd59eec7ee13f1d860bd961c5bd2d9bd62f8be9b5af9329650bcc79973bc16e"
     },
     "grantAuditorDisclosure.prover": {
       "type": "file",
-      "size": 11277611,
-      "hash": "e68b9a11f2226d55991cc837510d7993ec81e74ba8f0e31f868cc615d2161a5f"
+      "size": 22550285,
+      "hash": "bda5ea2c414451a449739b6caf40b5ef19a87ebe47249968443ecec2f8f23245"
     },
     "grantAuditorDisclosure.verifier": {
       "type": "file",
       "size": 2121,
-      "hash": "bd18217e3c52ae1af5745b49e24056f431b6c0eaca7474d88ffdab15ac6294af"
+      "hash": "0f5e7b44bbeffd51e265b6db6228cda23e0d4af57db2b6dfdad2a1867bc633c0"
     },
     "tightenCovenantPolicy.prover": {
       "type": "file",
-      "size": 11277386,
-      "hash": "2b2e5fd3d4f02ecb28fc41b60e424f45ffd6da35542859c3788b8acdaab7e24c"
+      "size": 11277791,
+      "hash": "420198b9f32fc2b5df8c01fed3aad17e5ece82bfdf5e7c2dc998deb4e44a8ed0"
     },
     "tightenCovenantPolicy.verifier": {
       "type": "file",
       "size": 2121,
-      "hash": "4dad7e7a86ddb2599c52449dd47f7bec05b5705b87840f08f03f716a78dc5a1a"
+      "hash": "d4b1f64d329816be5083b135fbd20f9915094d2fb8a3a98fd152e39cce69f3aa"
     }
   }
 }

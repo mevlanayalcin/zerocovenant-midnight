@@ -28,6 +28,20 @@
       "proof": false,
       "arguments": [
         {
+          "name": "entityCommit",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        },
+        {
+          "name": "epochVal",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        },
+        {
           "name": "b0",
           "type": {
             "type-name": "Uint",
@@ -88,13 +102,6 @@
           }
         },
         {
-          "name": "epochVal",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
           "name": "salt",
           "type": {
             "type-name": "Bytes",
@@ -112,6 +119,38 @@
       "pure": true,
       "proof": false,
       "arguments": [
+        {
+          "name": "auditorPk",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        },
+        {
+          "name": "targetEpoch",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "computeDisclosureTag",
+      "pure": true,
+      "proof": false,
+      "arguments": [
+        {
+          "name": "epochRoot",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        },
         {
           "name": "auditorPk",
           "type": {
@@ -235,29 +274,6 @@
         "type-name": "Bytes",
         "length": 32
       }
-    },
-    {
-      "name": "getAuditorSecretTag",
-      "arguments": [
-        {
-          "name": "auditorPk",
-          "type": {
-            "type-name": "Bytes",
-            "length": 32
-          }
-        },
-        {
-          "name": "epochVal",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        }
-      ],
-      "result type": {
-        "type-name": "Bytes",
-        "length": 32
-      }
     }
   ],
   "contracts": [
@@ -345,8 +361,22 @@
       }
     },
     {
-      "name": "auditorGrants",
+      "name": "epochRoots",
       "index": 9,
+      "exported": true,
+      "storage": "Map",
+      "key": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      },
+      "value": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "auditorGrants",
+      "index": 10,
       "exported": true,
       "storage": "Map",
       "key": {

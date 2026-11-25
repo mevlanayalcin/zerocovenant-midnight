@@ -6,7 +6,7 @@
   "type": "module",
   "description": "ZeroCovenant — Privacy-Preserving Institutional Proof-of-Solvency, Risk Covenant & Selective Auditor Disclosure on Midnight",
   "scripts": {
-    "compact": "../.research/compact-bin/compactc contract/src/zero_covenant.compact contract/src/managed/zero_covenant",
+    "compact": "compactc contract/src/zero_covenant.compact contract/src/managed/zero_covenant",
     "dev": "vite",
     "dev:server": "tsx watch src/server/node.ts",
     "start": "tsx src/server/node.ts",

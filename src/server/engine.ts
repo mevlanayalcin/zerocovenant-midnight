@@ -1,8 +1,7 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { pureCircuits } from "../../contract/src/managed/zero_covenant/contract/index.js";
 import {
   ZeroCovenantSimulator,
-  fromSeedByte,
   toHex
 } from "../../contract/src/simulator.js";
 
@@ -17,23 +16,8 @@ export interface PublicLedgerSnapshot {
   lastSolvencyVerified: boolean;
   lastAttestedEpoch: string;
   usedNullifiersCount: string;
+  epochRootsCount: string;
   auditorGrantsCount: string;
-}
-
-export interface PrivateWitnessSnapshot {
-  custodianLabels: [string, string, string, string];
-  custodianBalancesUsd: [string, string, string, string];
-  totalAssetsUsd: string;
-  totalLiabilitiesUsd: string;
-  excessBufferUsd: string;
-  reserveRatioBps: string;
-  reserveRatioPct: string;
-  maxSingleShareBps: string;
-  maxSingleSharePct: string;
-  maxCustodianIndex: number;
-  deskSecretMasked: string;
-  epochSaltHex: string;
-  compliantWithCurrentCovenant: boolean;
 }
 
 export interface CircuitEventRecord {
@@ -63,24 +47,33 @@ export interface AuditorGrantRecord {
   grantedAt: string;
 }
 
-export interface DeskSessionState {
+export interface PublicDeskSessionState {
   sessionId: string;
   deskName: string;
   publicLedger: PublicLedgerSnapshot;
-  privateWitness: PrivateWitnessSnapshot;
+  epochRoots: Record<string, string>;
   history: CircuitEventRecord[];
   grants: AuditorGrantRecord[];
   lastNullifierHex: string | null;
 }
 
-const CUSTODIAN_LABELS: [string, string, string, string] = [
+export interface ClientSeedBundle {
+  custodianLabels: [string, string, string, string];
+  epoch: string;
+  custodianBalancesUsd: [string, string, string, string];
+  totalLiabilitiesUsd: string;
+  epochSaltHex: string;
+  defaultAuditorLabel: string;
+}
+
+export const CUSTODIAN_LABELS: [string, string, string, string] = [
   "Fireblocks Vault",
   "Coinbase Prime Cold",
   "Anchorage Digital",
   "Copper ClearLoop"
 ];
 
-function parseBytes32Hex(input: string, fallbackSeed = 0x42): Uint8Array {
+function parseBytes32Hex(input: string): Uint8Array {
   const clean = input.trim().toLowerCase().replace(/^0x/, "");
   if (/^[0-9a-f]{64}$/.test(clean)) {
     return Uint8Array.from(Buffer.from(clean, "hex"));
@@ -88,7 +81,7 @@ function parseBytes32Hex(input: string, fallbackSeed = 0x42): Uint8Array {
   if (input.trim().length > 0) {
     return Uint8Array.from(createHash("sha256").update(input.trim()).digest());
   }
-  return fromSeedByte(fallbackSeed);
+  return Uint8Array.from(randomBytes(32));
 }
 
 function formatPctFromBps(bps: bigint): string {
@@ -102,25 +95,52 @@ function extractErrorMessage(err: unknown): string {
   return String(err);
 }
 
+const ZERO_SALT = new Uint8Array(32);
+
 class ManagedDeskSession {
   readonly sessionId: string;
   readonly deskName: string;
   readonly simulator: ZeroCovenantSimulator;
+  readonly createdAtMs: number;
+  lastAccessMs: number;
   private deskSecret: Uint8Array;
+  private sessionTokenHash: Buffer;
   readonly history: CircuitEventRecord[] = [];
   readonly grants: AuditorGrantRecord[] = [];
   private lastNullifierHex: string | null = null;
+  private attestedEpochs: bigint[] = [];
 
   constructor(
     sessionId: string,
     deskName: string,
     simulator: ZeroCovenantSimulator,
-    deskSecret: Uint8Array
+    deskSecret: Uint8Array,
+    sessionToken: string
   ) {
     this.sessionId = sessionId;
     this.deskName = deskName;
     this.simulator = simulator;
     this.deskSecret = deskSecret;
+    this.sessionTokenHash = createHash("sha256").update(sessionToken).digest();
+    this.createdAtMs = Date.now();
+    this.lastAccessMs = this.createdAtMs;
+  }
+
+  verifySessionToken(candidate: string | undefined): boolean {
+    if (!candidate || typeof candidate !== "string") return false;
+    const candidateHash = createHash("sha256").update(candidate).digest();
+    if (candidateHash.length !== this.sessionTokenHash.length) return false;
+    return timingSafeEqual(candidateHash, this.sessionTokenHash);
+  }
+
+  private scrubTransientWitnesses(): void {
+    // Wipe transient balance sheet & salt from prover memory after every circuit call;
+    // the server NEVER retains or exposes private witness balances via GET /api/v1/session.
+    this.simulator.setPrivateSnapshot({
+      custodianBalances: [0n, 0n, 0n, 0n],
+      totalLiabilities: 0n,
+      epochSalt: ZERO_SALT
+    });
   }
 
   private pushEvent(ev: Omit<CircuitEventRecord, "id" | "timestamp" | "privateFieldsLeaked">): CircuitEventRecord {
@@ -135,30 +155,15 @@ class ManagedDeskSession {
     return full;
   }
 
-  snapshot(): DeskSessionState {
+  publicSnapshot(): PublicDeskSessionState {
+    this.lastAccessMs = Date.now();
     const l = this.simulator.getLedger();
-    const p = this.simulator.getPrivateState();
-    const totalAssets = p.custodianBalances.reduce((acc, v) => acc + v, 0n);
-    const excess = totalAssets - p.totalLiabilities;
-    const ratioBps = p.totalLiabilities > 0n ? (totalAssets * 10000n) / p.totalLiabilities : 0n;
-
-    let maxBal = 0n;
-    let maxIdx = 0;
-    p.custodianBalances.forEach((b, idx) => {
-      if (b > maxBal) {
-        maxBal = b;
-        maxIdx = idx;
+    const epochRootsObj: Record<string, string> = {};
+    for (const ep of this.attestedEpochs) {
+      if (l.epochRoots.member(ep)) {
+        epochRootsObj[ep.toString()] = toHex(l.epochRoots.lookup(ep));
       }
-    });
-    const maxSingleBps = totalAssets > 0n ? (maxBal * 10000n) / totalAssets : 0n;
-
-    const compliant =
-      totalAssets > 0n &&
-      totalAssets * 10000n >= p.totalLiabilities * l.covenantMinRatioBps &&
-      maxBal * 10000n <= totalAssets * l.covenantMaxSingleBps;
-
-    const skHex = toHex(this.deskSecret);
-    const deskSecretMasked = `${skHex.slice(0, 10)}...${skHex.slice(-6)} (local-only)`;
+    }
 
     return {
       sessionId: this.sessionId,
@@ -174,28 +179,10 @@ class ManagedDeskSession {
         lastSolvencyVerified: l.lastSolvencyVerified,
         lastAttestedEpoch: l.lastAttestedEpoch.toString(),
         usedNullifiersCount: l.usedNullifiers.size().toString(),
+        epochRootsCount: l.epochRoots.size().toString(),
         auditorGrantsCount: l.auditorGrants.size().toString()
       },
-      privateWitness: {
-        custodianLabels: CUSTODIAN_LABELS,
-        custodianBalancesUsd: [
-          p.custodianBalances[0].toString(),
-          p.custodianBalances[1].toString(),
-          p.custodianBalances[2].toString(),
-          p.custodianBalances[3].toString()
-        ],
-        totalAssetsUsd: totalAssets.toString(),
-        totalLiabilitiesUsd: p.totalLiabilities.toString(),
-        excessBufferUsd: excess.toString(),
-        reserveRatioBps: ratioBps.toString(),
-        reserveRatioPct: formatPctFromBps(ratioBps),
-        maxSingleShareBps: maxSingleBps.toString(),
-        maxSingleSharePct: formatPctFromBps(maxSingleBps),
-        maxCustodianIndex: maxIdx,
-        deskSecretMasked,
-        epochSaltHex: toHex(p.epochSalt),
-        compliantWithCurrentCovenant: compliant
-      },
+      epochRoots: epochRootsObj,
       history: this.history,
       grants: this.grants.map((g) => {
         const keyBytes = parseBytes32Hex(g.grantKeyHex);
@@ -208,35 +195,47 @@ class ManagedDeskSession {
     };
   }
 
-  async runAttestSolvency(input?: {
-    custodianBalances?: [bigint, bigint, bigint, bigint];
-    totalLiabilities?: bigint;
+  async runAttestSolvency(input: {
+    custodianBalances: [bigint, bigint, bigint, bigint];
+    totalLiabilities: bigint;
     epochSaltHex?: string;
     autoFreshSalt?: boolean;
-  }): Promise<{ ok: boolean; event: CircuitEventRecord; state: DeskSessionState; error?: string }> {
-    const prevPrivate = this.simulator.getPrivateState();
-    const nextBalances = input?.custodianBalances ?? prevPrivate.custodianBalances;
-    const nextLiab = input?.totalLiabilities ?? prevPrivate.totalLiabilities;
-    const nextSalt = input?.epochSaltHex
-      ? parseBytes32Hex(input.epochSaltHex)
-      : input?.autoFreshSalt
-        ? Uint8Array.from(randomBytes(32))
-        : prevPrivate.epochSalt;
+  }): Promise<{
+    ok: boolean;
+    event: CircuitEventRecord;
+    state: PublicDeskSessionState;
+    committedSaltHex: string;
+    attestedEpoch?: string;
+    error?: string;
+  }> {
+    this.lastAccessMs = Date.now();
+    const nextSalt =
+      input.autoFreshSalt === false && input.epochSaltHex
+        ? parseBytes32Hex(input.epochSaltHex)
+        : input.epochSaltHex && input.autoFreshSalt === undefined
+          ? parseBytes32Hex(input.epochSaltHex)
+          : Uint8Array.from(randomBytes(32));
+
+    const committedSaltHex = toHex(nextSalt);
 
     this.simulator.setPrivateSnapshot({
-      custodianBalances: nextBalances,
-      totalLiabilities: nextLiab,
+      deskSecret: this.deskSecret,
+      custodianBalances: input.custodianBalances,
+      totalLiabilities: input.totalLiabilities,
       epochSalt: nextSalt
     });
 
     const epochBefore = this.simulator.getLedger().epoch;
-    const expectedNullifier = toHex(pureCircuits.computeNullifier(this.deskSecret, epochBefore, nextSalt));
+    const expectedNullifier = toHex(pureCircuits.computeNullifier(this.deskSecret, nextSalt));
     const t0 = performance.now();
 
     try {
       const res = await this.simulator.attestSolvency();
       const durationMs = Math.round(performance.now() - t0);
       this.lastNullifierHex = expectedNullifier;
+      if (!this.attestedEpochs.includes(epochBefore)) {
+        this.attestedEpochs.push(epochBefore);
+      }
       const ev = this.pushEvent({
         circuit: "attestSolvency",
         status: "VERIFIED",
@@ -247,7 +246,13 @@ class ManagedDeskSession {
         nullifierHex: expectedNullifier,
         message: `Epoch ${epochBefore.toString()} solvency + 4-custodian concentration covenant verified in ZK without exposing asset or liability figures.`
       });
-      return { ok: true, event: ev, state: this.snapshot() };
+      return {
+        ok: true,
+        event: ev,
+        state: this.publicSnapshot(),
+        committedSaltHex,
+        attestedEpoch: epochBefore.toString()
+      };
     } catch (err) {
       const durationMs = Math.round(performance.now() - t0);
       const msg = extractErrorMessage(err);
@@ -260,39 +265,74 @@ class ManagedDeskSession {
         nullifierHex: expectedNullifier,
         message: `Compact circuit assertion rejected state transition: ${msg}`
       });
-      return { ok: false, error: msg, event: ev, state: this.snapshot() };
+      return { ok: false, error: msg, event: ev, state: this.publicSnapshot(), committedSaltHex };
+    } finally {
+      this.scrubTransientWitnesses();
     }
   }
 
-  async simulateRogueKeyAttack(): Promise<{ ok: false; event: CircuitEventRecord; state: DeskSessionState; error: string }> {
+  async simulateRogueKeyAttack(): Promise<{
+    ok: false;
+    blocked: true;
+    event: CircuitEventRecord;
+    state: PublicDeskSessionState;
+    error: string;
+  }> {
+    this.lastAccessMs = Date.now();
     const epochBefore = this.simulator.getLedger().epoch;
     const rogueKey = Uint8Array.from(randomBytes(32));
-    this.simulator.setPrivateSnapshot({ deskSecret: rogueKey });
+    // Supply valid balances/liabilities so ONLY the rogue desk secret causes rejection
+    this.simulator.setPrivateSnapshot({
+      deskSecret: rogueKey,
+      custodianBalances: [3_200_000n, 3_100_000n, 2_900_000n, 2_800_000n],
+      totalLiabilities: 8_000_000n,
+      epochSalt: Uint8Array.from(randomBytes(32))
+    });
     const t0 = performance.now();
 
+    let caughtMessage = "";
+    let rogueRejected = false;
     try {
       await this.simulator.attestSolvency();
-      throw new Error("Unexpected pass on rogue key");
     } catch (err) {
-      const msg = extractErrorMessage(err);
-      const durationMs = Math.round(performance.now() - t0);
+      caughtMessage = extractErrorMessage(err);
+      rogueRejected = caughtMessage.includes("Unauthorized desk secret");
+    } finally {
       this.simulator.setPrivateSnapshot({ deskSecret: this.deskSecret });
-      const ev = this.pushEvent({
-        circuit: "rogueKeyTest",
-        status: "REJECTED",
-        epochBefore: epochBefore.toString(),
-        epochAfter: this.simulator.getLedger().epoch.toString(),
-        durationMs,
-        message: `Unauthorized desk secret blocked cleanly: ${msg}`
-      });
-      return { ok: false, error: msg, event: ev, state: this.snapshot() };
+      this.scrubTransientWitnesses();
     }
+
+    const durationMs = Math.round(performance.now() - t0);
+    if (!rogueRejected) {
+      throw new Error(
+        caughtMessage
+          ? `Rogue key test failed for unexpected reason instead of auth check: ${caughtMessage}`
+          : "CRITICAL: Unauthorized desk secret unexpectedly passed attestSolvency()"
+      );
+    }
+
+    const ev = this.pushEvent({
+      circuit: "rogueKeyTest",
+      status: "REJECTED",
+      epochBefore: epochBefore.toString(),
+      epochAfter: this.simulator.getLedger().epoch.toString(),
+      durationMs,
+      message: `Unauthorized desk secret blocked cleanly: ${caughtMessage}`
+    });
+    return { ok: false, blocked: true, error: caughtMessage, event: ev, state: this.publicSnapshot() };
   }
 
   async grantAuditor(input: {
     auditorLabel: string;
     targetEpoch?: bigint;
-  }): Promise<{ ok: boolean; grant?: AuditorGrantRecord; event: CircuitEventRecord; state: DeskSessionState; error?: string }> {
+  }): Promise<{
+    ok: boolean;
+    grant?: AuditorGrantRecord;
+    event: CircuitEventRecord;
+    state: PublicDeskSessionState;
+    error?: string;
+  }> {
+    this.lastAccessMs = Date.now();
     const ledgerNow = this.simulator.getLedger();
     const targetEpoch = input.targetEpoch ?? ledgerNow.lastAttestedEpoch;
     const auditorPk = parseBytes32Hex(input.auditorLabel);
@@ -300,6 +340,7 @@ class ManagedDeskSession {
     const t0 = performance.now();
 
     try {
+      this.simulator.setPrivateSnapshot({ deskSecret: this.deskSecret });
       const res = await this.simulator.grantAuditorDisclosure(auditorPk, targetEpoch);
       const durationMs = Math.round(performance.now() - t0);
       const grant: AuditorGrantRecord = {
@@ -311,7 +352,12 @@ class ManagedDeskSession {
         verifiedOnLedger: res.ledger.auditorGrants.member(parseBytes32Hex(res.grantKeyHex)),
         grantedAt: new Date().toISOString()
       };
-      this.grants.unshift(grant);
+      const existingIdx = this.grants.findIndex((g) => g.grantKeyHex === grant.grantKeyHex);
+      if (existingIdx >= 0) {
+        this.grants[existingIdx] = grant;
+      } else {
+        this.grants.unshift(grant);
+      }
       if (this.grants.length > 25) this.grants.length = 25;
 
       const ev = this.pushEvent({
@@ -323,9 +369,9 @@ class ManagedDeskSession {
         grantKeyHex: res.grantKeyHex,
         disclosureTagHex: res.tagHex,
         auditorLabel: input.auditorLabel,
-        message: `Selective epoch-${targetEpoch.toString()} disclosure key published for ${input.auditorLabel} without exposing balances publicly.`
+        message: `Selective epoch-${targetEpoch.toString()} one-way disclosure tag published for ${input.auditorLabel} (zero secret-key exposure).`
       });
-      return { ok: true, grant, event: ev, state: this.snapshot() };
+      return { ok: true, grant, event: ev, state: this.publicSnapshot() };
     } catch (err) {
       const durationMs = Math.round(performance.now() - t0);
       const msg = extractErrorMessage(err);
@@ -338,18 +384,22 @@ class ManagedDeskSession {
         auditorLabel: input.auditorLabel,
         message: `Disclosure rejected: ${msg}`
       });
-      return { ok: false, error: msg, event: ev, state: this.snapshot() };
+      return { ok: false, error: msg, event: ev, state: this.publicSnapshot() };
+    } finally {
+      this.scrubTransientWitnesses();
     }
   }
 
   async tightenPolicy(input: {
     minRatioBps: bigint;
     maxSingleBps: bigint;
-  }): Promise<{ ok: boolean; event: CircuitEventRecord; state: DeskSessionState; error?: string }> {
+  }): Promise<{ ok: boolean; event: CircuitEventRecord; state: PublicDeskSessionState; error?: string }> {
+    this.lastAccessMs = Date.now();
     const epochBefore = this.simulator.getLedger().epoch;
     const t0 = performance.now();
 
     try {
+      this.simulator.setPrivateSnapshot({ deskSecret: this.deskSecret });
       const nextLedger = await this.simulator.tightenCovenantPolicy(input.minRatioBps, input.maxSingleBps);
       const durationMs = Math.round(performance.now() - t0);
       const ev = this.pushEvent({
@@ -358,9 +408,9 @@ class ManagedDeskSession {
         epochBefore: epochBefore.toString(),
         epochAfter: nextLedger.epoch.toString(),
         durationMs,
-        message: `On-chain risk covenant updated: Min Solvency ${formatPctFromBps(input.minRatioBps)}, Max Single Custodian ${formatPctFromBps(input.maxSingleBps)}.`
+        message: `On-chain risk covenant tightened: Min Solvency ${formatPctFromBps(input.minRatioBps)}, Max Single Custodian ${formatPctFromBps(input.maxSingleBps)}. Re-attestation required (lastSolvencyVerified reset to false).`
       });
-      return { ok: true, event: ev, state: this.snapshot() };
+      return { ok: true, event: ev, state: this.publicSnapshot() };
     } catch (err) {
       const durationMs = Math.round(performance.now() - t0);
       const msg = extractErrorMessage(err);
@@ -372,7 +422,9 @@ class ManagedDeskSession {
         durationMs,
         message: `Covenant policy update rejected: ${msg}`
       });
-      return { ok: false, error: msg, event: ev, state: this.snapshot() };
+      return { ok: false, error: msg, event: ev, state: this.publicSnapshot() };
+    } finally {
+      this.scrubTransientWitnesses();
     }
   }
 
@@ -383,27 +435,38 @@ class ManagedDeskSession {
     totalLiabilities: bigint;
     epochSaltHex: string;
   }) {
+    this.lastAccessMs = Date.now();
     const ledgerNow = this.simulator.getLedger();
     const auditorPk = parseBytes32Hex(input.auditorLabel);
     const salt = parseBytes32Hex(input.epochSaltHex);
 
-    const recomputedRoot = toHex(
-      pureCircuits.computeReserveRoot(
-        input.custodianBalances[0],
-        input.custodianBalances[1],
-        input.custodianBalances[2],
-        input.custodianBalances[3],
-        input.totalLiabilities,
-        salt
-      )
+    const recomputedRootBytes = pureCircuits.computeReserveRoot(
+      ledgerNow.entityCommitment,
+      input.targetEpoch,
+      input.custodianBalances[0],
+      input.custodianBalances[1],
+      input.custodianBalances[2],
+      input.custodianBalances[3],
+      input.totalLiabilities,
+      salt
     );
-    const recomputedGrantKey = toHex(pureCircuits.computeGrantKey(auditorPk, input.targetEpoch));
+    const recomputedRoot = toHex(recomputedRootBytes);
 
-    const grantKeyBytes = parseBytes32Hex(recomputedGrantKey);
-    const grantOnLedger = ledgerNow.auditorGrants.member(grantKeyBytes);
-    const ledgerTagHex = grantOnLedger ? toHex(ledgerNow.auditorGrants.lookup(grantKeyBytes)) : null;
-    const ledgerRootHex = toHex(ledgerNow.lastSolvencyRoot);
-    const rootMatchesLatest = recomputedRoot === ledgerRootHex;
+    const recomputedGrantKeyBytes = pureCircuits.computeGrantKey(auditorPk, input.targetEpoch);
+    const recomputedGrantKey = toHex(recomputedGrantKeyBytes);
+
+    const recomputedTagBytes = pureCircuits.computeDisclosureTag(recomputedRootBytes, auditorPk, input.targetEpoch);
+    const recomputedTagHex = toHex(recomputedTagBytes);
+
+    const epochRootOnLedger = ledgerNow.epochRoots.member(input.targetEpoch);
+    const ledgerEpochRootHex = epochRootOnLedger ? toHex(ledgerNow.epochRoots.lookup(input.targetEpoch)) : null;
+    const rootMatchesEpoch = epochRootOnLedger && ledgerEpochRootHex === recomputedRoot;
+
+    const grantOnLedger = ledgerNow.auditorGrants.member(recomputedGrantKeyBytes);
+    const ledgerTagHex = grantOnLedger ? toHex(ledgerNow.auditorGrants.lookup(recomputedGrantKeyBytes)) : null;
+    const tagMatchesLedger = grantOnLedger && ledgerTagHex === recomputedTagHex;
+
+    const verified = grantOnLedger && rootMatchesEpoch && tagMatchesLedger;
 
     const totalAssets = input.custodianBalances.reduce((a, b) => a + b, 0n);
     const ratioBps = input.totalLiabilities > 0n ? (totalAssets * 10000n) / input.totalLiabilities : 0n;
@@ -411,13 +474,16 @@ class ManagedDeskSession {
     const maxShareBps = totalAssets > 0n ? (maxBal * 10000n) / totalAssets : 0n;
 
     return {
-      verified: grantOnLedger && (input.targetEpoch !== ledgerNow.lastAttestedEpoch || rootMatchesLatest),
+      verified,
       grantOnLedger,
+      rootMatchesEpoch,
+      tagMatchesLedger,
       ledgerTagHex,
+      recomputedTagHex,
       recomputedGrantKey,
       recomputedRoot,
-      ledgerRootHex,
-      rootMatchesLatest,
+      ledgerEpochRootHex,
+      ledgerRootHex: ledgerEpochRootHex ?? toHex(ledgerNow.lastSolvencyRoot),
       targetEpoch: input.targetEpoch.toString(),
       lastAttestedEpoch: ledgerNow.lastAttestedEpoch.toString(),
       auditedTotalAssetsUsd: totalAssets.toString(),
@@ -428,42 +494,110 @@ class ManagedDeskSession {
   }
 }
 
+const MAX_SESSIONS = 200;
 const sessions = new Map<string, ManagedDeskSession>();
 
-async function seedDefaultSession(sessionId: string, deskName: string): Promise<ManagedDeskSession> {
-  const deskSecret = createHash("sha256").update(`zerocovenant:${sessionId}:secret:v1`).digest();
+function evictOldestIfNeeded(): void {
+  if (sessions.size < MAX_SESSIONS) return;
+  let oldestKey: string | null = null;
+  let oldestTs = Infinity;
+  for (const [key, sess] of sessions.entries()) {
+    if (sess.lastAccessMs < oldestTs) {
+      oldestTs = sess.lastAccessMs;
+      oldestKey = key;
+    }
+  }
+  if (oldestKey) sessions.delete(oldestKey);
+}
+
+async function createSeededSession(
+  sessionId: string,
+  deskName: string
+): Promise<{
+  session: ManagedDeskSession;
+  sessionToken: string;
+  initialClientSeed: ClientSeedBundle;
+}> {
+  evictOldestIfNeeded();
+
+  // Cryptographically random desk secret + authentication token per visitor session
+  const deskSecret = Uint8Array.from(randomBytes(32));
+  const sessionToken = randomBytes(24).toString("hex");
+  const epoch1SaltHex = toHex(Uint8Array.from(randomBytes(32)));
+
   const sim = await ZeroCovenantSimulator.create({
-    deskSecret: Uint8Array.from(deskSecret),
+    deskSecret,
     initialMinRatioBps: 12_000n,
     initialMaxSingleBps: 4_000n
   });
 
-  const managed = new ManagedDeskSession(sessionId, deskName, sim, Uint8Array.from(deskSecret));
+  const managed = new ManagedDeskSession(sessionId, deskName, sim, deskSecret, sessionToken);
 
-  // Pre-seed Epoch 1 diversified institutional reserve attestation + FINRA auditor grant
+  const seedBalances: [bigint, bigint, bigint, bigint] = [3_200_000n, 3_100_000n, 2_900_000n, 2_800_000n];
+  const seedLiabilities = 8_000_000n;
+  const defaultAuditor = "finra-institutional-audit-2026";
+
   await managed.runAttestSolvency({
-    custodianBalances: [3_200_000n, 3_100_000n, 2_900_000n, 2_800_000n],
-    totalLiabilities: 8_000_000n,
-    epochSaltHex: toHex(fromSeedByte(0x21))
+    custodianBalances: seedBalances,
+    totalLiabilities: seedLiabilities,
+    epochSaltHex: epoch1SaltHex,
+    autoFreshSalt: false
   });
   await managed.grantAuditor({
-    auditorLabel: "finra-institutional-audit-2026",
+    auditorLabel: defaultAuditor,
     targetEpoch: 1n
   });
 
   sessions.set(sessionId, managed);
-  return managed;
+
+  return {
+    session: managed,
+    sessionToken,
+    initialClientSeed: {
+      custodianLabels: CUSTODIAN_LABELS,
+      epoch: "1",
+      custodianBalancesUsd: [
+        seedBalances[0].toString(),
+        seedBalances[1].toString(),
+        seedBalances[2].toString(),
+        seedBalances[3].toString()
+      ],
+      totalLiabilitiesUsd: seedLiabilities.toString(),
+      epochSaltHex: epoch1SaltHex,
+      defaultAuditorLabel: defaultAuditor
+    }
+  };
 }
 
-export async function getOrCreateSession(sessionId = "alpha-treasury"): Promise<ManagedDeskSession> {
-  const safeId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48) || "alpha-treasury";
-  const existing = sessions.get(safeId);
-  if (existing) return existing;
-  return seedDefaultSession(safeId, safeId === "alpha-treasury" ? "Meridian Institutional Desk #1" : `Desk ${safeId}`);
+export async function initIsolatedSession(preferredDeskName?: string): Promise<{
+  session: ManagedDeskSession;
+  sessionToken: string;
+  initialClientSeed: ClientSeedBundle;
+}> {
+  const sessionId = `desk_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  const cleanName = (preferredDeskName || "Institutional Treasury Desk").trim().slice(0, 48);
+  return createSeededSession(sessionId, cleanName || "Institutional Treasury Desk");
 }
 
-export async function resetSession(sessionId = "alpha-treasury"): Promise<ManagedDeskSession> {
-  const safeId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48) || "alpha-treasury";
-  sessions.delete(safeId);
-  return seedDefaultSession(safeId, safeId === "alpha-treasury" ? "Meridian Institutional Desk #1" : `Desk ${safeId}`);
+export function getExistingSession(sessionId: string): ManagedDeskSession | null {
+  const safeId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48);
+  if (!safeId) return null;
+  return sessions.get(safeId) ?? null;
+}
+
+export async function resetAuthenticatedSession(
+  sessionId: string,
+  sessionToken: string | undefined
+): Promise<{
+  session: ManagedDeskSession;
+  sessionToken: string;
+  initialClientSeed: ClientSeedBundle;
+} | null> {
+  const existing = getExistingSession(sessionId);
+  if (!existing || !existing.verifySessionToken(sessionToken)) {
+    return null;
+  }
+  const deskName = existing.deskName;
+  sessions.delete(existing.sessionId);
+  return createSeededSession(existing.sessionId, deskName);
 }

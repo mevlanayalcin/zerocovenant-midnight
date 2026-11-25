@@ -15,19 +15,21 @@ export ledger lastSolvencyRoot: Bytes<32>;
 export ledger lastSolvencyVerified: Boolean;
 export ledger lastAttestedEpoch: Uint<64>;
 export ledger usedNullifiers: Set<Bytes<32>>;
+export ledger epochRoots: Map<Uint<64>, Bytes<32>>;
 export ledger auditorGrants: Map<Bytes<32>, Bytes<32>>;
 
 witness localDeskSecret(): Bytes<32>;
 witness getCustodianBalances(): Vector<4, Uint<64>>;
 witness getTotalLiabilities(): Uint<64>;
 witness getEpochSalt(): Bytes<32>;
-witness getAuditorSecretTag(auditorPk: Bytes<32>, epochVal: Uint<64>): Bytes<32>;
 
 export pure circuit deriveEntityCommitment(sk: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<2, Bytes<32>>>([pad(32, "zc:entity:v1"), sk]);
 }
 
 export pure circuit computeReserveRoot(
+  entityCommit: Bytes<32>,
+  epochVal: Uint<64>,
   b0: Uint<64>,
   b1: Uint<64>,
   b2: Uint<64>,
@@ -35,8 +37,10 @@ export pure circuit computeReserveRoot(
   liabilities: Uint<64>,
   salt: Bytes<32>
 ): Bytes<32> {
-  return persistentHash<Vector<7, Bytes<32>>>([
-    pad(32, "zc:root:v1"),
+  return persistentHash<Vector<9, Bytes<32>>>([
+    pad(32, "zc:root:v2"),
+    entityCommit,
+    (epochVal as Field) as Bytes<32>,
     (b0 as Field) as Bytes<32>,
     (b1 as Field) as Bytes<32>,
     (b2 as Field) as Bytes<32>,
@@ -46,11 +50,12 @@ export pure circuit computeReserveRoot(
   ]);
 }
 
-export pure circuit computeNullifier(sk: Bytes<32>, epochVal: Uint<64>, salt: Bytes<32>): Bytes<32> {
-  return persistentHash<Vector<4, Bytes<32>>>([
-    pad(32, "zc:nullifier:v1"),
+// Cross-epoch anti-replay nullifier: omitting epoch ensures reusing a blinding
+// salt across ANY epoch triggers "Nullifier replay detected".
+export pure circuit computeNullifier(sk: Bytes<32>, salt: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "zc:nullifier:v2"),
     sk,
-    (epochVal as Field) as Bytes<32>,
     salt
   ]);
 }
@@ -63,14 +68,31 @@ export pure circuit computeGrantKey(auditorPk: Bytes<32>, targetEpoch: Uint<64>)
   ]);
 }
 
+// One-way disclosure tag bound strictly to the attested epoch root, auditor PK,
+// and target epoch — zero exposure of deskSecret.
+export pure circuit computeDisclosureTag(
+  epochRoot: Bytes<32>,
+  auditorPk: Bytes<32>,
+  targetEpoch: Uint<64>
+): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "zc:disclosure:v2"),
+    epochRoot,
+    auditorPk,
+    (targetEpoch as Field) as Bytes<32>
+  ]);
+}
+
 constructor(initialMinRatioBps: Uint<64>, initialMaxSingleBps: Uint<64>) {
-  assert(initialMinRatioBps >= 10000, "Minimum solvency ratio must be >= 10000 bps (100%)");
-  assert(initialMaxSingleBps >= 1000 && initialMaxSingleBps <= 10000, "Concentration cap must be 1000..10000 bps");
+  const initMin = disclose(initialMinRatioBps);
+  const initMax = disclose(initialMaxSingleBps);
+  assert(initMin >= 10000, "Minimum solvency ratio must be >= 10000 bps (100%)");
+  assert(initMax >= 2500 && initMax <= 10000, "Concentration cap must be 2500..10000 bps for 4 custodians");
 
   const sk = localDeskSecret();
   entityCommitment = disclose(deriveEntityCommitment(sk));
-  covenantMinRatioBps = disclose(initialMinRatioBps);
-  covenantMaxSingleBps = disclose(initialMaxSingleBps);
+  covenantMinRatioBps = initMin;
+  covenantMaxSingleBps = initMax;
   lastSolvencyVerified = false;
   lastAttestedEpoch = 0;
   epoch.increment(1);
@@ -78,7 +100,7 @@ constructor(initialMinRatioBps: Uint<64>, initialMaxSingleBps: Uint<64>) {
 
 export circuit attestSolvency(): Bytes<32> {
   const sk = localDeskSecret();
-  assert(entityCommitment == deriveEntityCommitment(sk), "Unauthorized desk secret key");
+  assert(disclose(entityCommitment == deriveEntityCommitment(sk)), "Unauthorized desk secret key");
 
   const b = getCustodianBalances();
   const liabilities = getTotalLiabilities();
@@ -87,6 +109,7 @@ export circuit attestSolvency(): Bytes<32> {
   const totalAssets = b[0] + b[1] + b[2] + b[3];
 
   assert(totalAssets > 0, "Total reserves must be strictly positive");
+  assert(liabilities > 0, "Total liabilities must be strictly positive");
 
   // Zero-knowledge solvency inequality: totalAssets * 10000 >= liabilities * covenantMinRatioBps
   assert(totalAssets * 10000 >= liabilities * covenantMinRatioBps, "Solvency covenant ratio breached");
@@ -98,13 +121,16 @@ export circuit attestSolvency(): Bytes<32> {
   assert(b[2] * 10000 <= maxAllowed, "Custodian 2 concentration exceeds covenant cap");
   assert(b[3] * 10000 <= maxAllowed, "Custodian 3 concentration exceeds covenant cap");
 
-  // Anti-replay nullifier binding desk secret, current epoch, and blinding salt
+  // Cross-epoch anti-replay nullifier binding desk secret and blinding salt
   const curEpoch = epoch as Uint<64>;
-  const nul = disclose(computeNullifier(sk, curEpoch, salt));
+  const nul = disclose(computeNullifier(sk, salt));
   assert(!usedNullifiers.member(nul), "Nullifier replay detected");
   usedNullifiers.insert(nul);
 
-  const root = disclose(computeReserveRoot(b[0], b[1], b[2], b[3], liabilities, salt));
+  const root = disclose(
+    computeReserveRoot(entityCommitment, curEpoch, b[0], b[1], b[2], b[3], liabilities, salt)
+  );
+  epochRoots.insert(curEpoch, root);
   lastSolvencyRoot = root;
   lastSolvencyVerified = true;
   lastAttestedEpoch = curEpoch;
@@ -116,22 +142,29 @@ export circuit attestSolvency(): Bytes<32> {
 export circuit grantAuditorDisclosure(auditorPk: Bytes<32>, targetEpoch: Uint<64>): Bytes<32> {
   const sk = localDeskSecret();
   assert(disclose(entityCommitment == deriveEntityCommitment(sk)), "Unauthorized desk secret key");
-  const gtZero = disclose(targetEpoch > 0);
-  const lteLast = disclose(targetEpoch <= lastAttestedEpoch);
-  assert(gtZero && lteLast, "Invalid target epoch");
+  const epochDisclosed = disclose(targetEpoch);
+  const auditorDisclosed = disclose(auditorPk);
+  assert(epochDisclosed > 0 && epochDisclosed <= lastAttestedEpoch, "Invalid target epoch");
+  assert(epochRoots.member(epochDisclosed), "Target epoch root not found");
 
-  const grantKey = disclose(computeGrantKey(auditorPk, targetEpoch));
-  const tag = disclose(getAuditorSecretTag(auditorPk, targetEpoch));
+  const epochRoot = epochRoots.lookup(epochDisclosed);
+  const grantKey = computeGrantKey(auditorDisclosed, epochDisclosed);
+  const tag = computeDisclosureTag(epochRoot, auditorDisclosed, epochDisclosed);
   auditorGrants.insert(grantKey, tag);
   return tag;
 }
 
 export circuit tightenCovenantPolicy(newMinRatioBps: Uint<64>, newMaxSingleBps: Uint<64>): [] {
   const sk = localDeskSecret();
-  assert(entityCommitment == deriveEntityCommitment(sk), "Unauthorized desk secret key");
-  assert(newMinRatioBps >= 10000, "Solvency ratio must be >= 10000 bps");
-  assert(newMaxSingleBps >= 1000 && newMaxSingleBps <= 10000, "Concentration cap must be 1000..10000 bps");
+  assert(disclose(entityCommitment == deriveEntityCommitment(sk)), "Unauthorized desk secret key");
+  const nextMin = disclose(newMinRatioBps);
+  const nextMax = disclose(newMaxSingleBps);
+  assert(nextMin >= 10000, "Solvency ratio must be >= 10000 bps");
+  assert(nextMax >= 2500 && nextMax <= 10000, "Concentration cap must be 2500..10000 bps for 4 custodians");
+  assert(nextMin >= covenantMinRatioBps, "Covenant solvency ratio can only tighten");
+  assert(nextMax <= covenantMaxSingleBps, "Covenant concentration cap can only tighten");
 
-  covenantMinRatioBps = disclose(newMinRatioBps);
-  covenantMaxSingleBps = disclose(newMaxSingleBps);
+  covenantMinRatioBps = nextMin;
+  covenantMaxSingleBps = nextMax;
+  lastSolvencyVerified = false;
 }

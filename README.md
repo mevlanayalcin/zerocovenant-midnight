@@ -8,7 +8,7 @@
 
 > **Why naive Proof-of-Reserves fails institutions:** Publishing aggregate reserves (`sum(assets) >= liabilities`) either leaks sensitive counterparty balances on public blockchains or hides catastrophic single-venue concentration (e.g., 150% solvent on paper while 62.5% of assets sit on one failing custodian).
 >
-> **ZeroCovenant** enforces BOTH collateral adequacy AND per-custodian concentration caps (`<= covenantMaxSingleBps`) inside Zero-Knowledge circuits while leaking **0 private USD amounts, 0 custodian balances, 0 liabilities, and 0 desk keys** to the public Midnight ledger.
+> **ZeroCovenant** enforces BOTH collateral adequacy AND per-custodian concentration caps (`<= covenantMaxSingleBps`) inside Zero-Knowledge circuits while leaking **0 private USD amounts, 0 custodian balances, 0 liabilities, 0 salts, and 0 desk keys** to the public Midnight ledger or HTTP GET APIs.
 
 ---
 
@@ -25,33 +25,36 @@
 
 | Layer | Stored Data | Visibility |
 | :--- | :--- | :--- |
-| **Private Witness State (`ZeroCovenantPrivateState`)** | `deskSecret` (`Bytes<32>`), 4 custodian balances `b[0..3]` (`Vector<4, Uint<64>>`), `totalLiabilities` (`Uint<64>`), `epochSalt` (`Bytes<32>`), per-auditor tag witness | **Local Prover Memory Only** — never leaves witness context |
-| **Public Midnight Ledger (`export ledger`)** | `epoch`, `attestationCount`, `entityCommitment`, `covenantMinRatioBps`, `covenantMaxSingleBps`, `lastSolvencyRoot`, `lastSolvencyVerified`, `lastAttestedEpoch`, `usedNullifiers`, `auditorGrants` | **Public On-Chain State** — only cryptographic commitments, booleans, counters & explicit `disclose(...)` outputs |
+| **Private Witness State (`ZeroCovenantPrivateState`)** | `deskSecret` (`Bytes<32>`), 4 custodian balances `b[0..3]` (`Vector<4, Uint<64>>`), `totalLiabilities` (`Uint<64>`), `epochSalt` (`Bytes<32>`) | **Browser-Local Vault / Ephemeral Prover Memory Only** — scrubbed after every circuit call and never exposed on `GET /api/v1/session` |
+| **Public Midnight Ledger (`export ledger`)** | `epoch`, `attestationCount`, `entityCommitment`, `covenantMinRatioBps`, `covenantMaxSingleBps`, `lastSolvencyRoot`, `lastSolvencyVerified`, `lastAttestedEpoch`, `epochRoots: Map<Uint<64>, Bytes<32>>`, `usedNullifiers: Set<Bytes<32>>`, `auditorGrants: Map<Bytes<32>, Bytes<32>>` | **Public On-Chain State** — only cryptographic commitments, historical epoch roots, booleans, counters & explicit `disclose(...)` outputs |
 
-### Compiled Compact Circuits (`compactc 0.36.1`)
+### Compiled Compact Circuits (`compactc 0.36.1`, No `--skip-zk`)
 
-All circuits in [`contract/src/zero_covenant.compact`](./contract/src/zero_covenant.compact) compile cleanly with full ZKIR & BLS12-381 prover/verifier keys (no `--skip-zk`):
+All circuits in [`contract/src/zero_covenant.compact`](./contract/src/zero_covenant.compact) compile cleanly with full ZKIR & BLS12-381 prover/verifier keys:
 
-1. **`attestSolvency(): Bytes<32>`** (119-line ZKIR)
+1. **`attestSolvency(): Bytes<32>`** (132-line ZKIR · Verifier SHA-256 `afd59eec...`)
    - Authenticates caller witness `localDeskSecret()` against public `entityCommitment`.
+   - Enforces `totalAssets > 0` AND `liabilities > 0` (preventing vacuous zero-liability proofs).
    - Verifies zero-knowledge reserve coverage inequality: `totalAssets * 10000 >= liabilities * covenantMinRatioBps`.
    - Verifies per-custodian concentration across all 4 private custodians: `b[i] * 10000 <= totalAssets * covenantMaxSingleBps`.
-   - Derives epoch-bound nullifier (`computeNullifier(sk, curEpoch, salt)`) and rejects duplicates via `usedNullifiers`.
-   - Discloses ONLY `lastSolvencyRoot = persistentHash(...)`, `lastSolvencyVerified = true`, `lastAttestedEpoch`, and increments counters.
-2. **`grantAuditorDisclosure(auditorPk, targetEpoch): Bytes<32>`** (55-line ZKIR)
-   - Inserts an epoch-scoped disclosure tag for a licensed auditor into public `auditorGrants` Map without revealing underlying balances to anyone else.
-3. **`tightenCovenantPolicy(newMinRatioBps, newMaxSingleBps)`** (43-line ZKIR)
-   - Updates on-chain minimum solvency and maximum venue concentration covenants under desk secret ownership control.
-4. **Pure Verification Circuits:** `deriveEntityCommitment`, `computeReserveRoot`, `computeNullifier`, `computeGrantKey`.
+   - Derives cross-epoch anti-replay nullifier `computeNullifier(sk, salt)` (epoch-independent so reusing ANY salt across ANY epoch triggers `"Nullifier replay detected"`).
+   - Anchors `root = computeReserveRoot(entityCommitment, curEpoch, b[0..3], liabilities, salt)` in BOTH `lastSolvencyRoot` and historical `epochRoots.insert(curEpoch, root)`.
+2. **`grantAuditorDisclosure(auditorPk, targetEpoch): Bytes<32>`** (68-line ZKIR · Verifier SHA-256 `0f5e7b44...`)
+   - Looks up `epochRoot = epochRoots.lookup(targetEpoch)` on-chain and computes one-way `computeDisclosureTag(epochRoot, auditorPk, targetEpoch)` with **zero `deskSecret` input** (eliminating secret-key recovery).
+   - Inserts `(computeGrantKey(auditorPk, targetEpoch) -> tag)` into public `auditorGrants`.
+3. **`tightenCovenantPolicy(newMinRatioBps, newMaxSingleBps)`** (61-line ZKIR · Verifier SHA-256 `d4b1f64d...`)
+   - Enforces **monotonic tightening only** (`newMinRatioBps >= covenantMinRatioBps`, `2500 <= newMaxSingleBps <= covenantMaxSingleBps`) and resets `lastSolvencyVerified = false` until a fresh attestation proves compliance under the stricter covenant.
+4. **Pure Verification Circuits:** `deriveEntityCommitment`, `computeReserveRoot`, `computeNullifier`, `computeGrantKey`, `computeDisclosureTag`.
 
 ---
 
 ## Walkthrough & Interactive Features
 
-1. **Dual-Ledger Proof Studio**: Inspect live Side-by-Side Private Witness Vault vs Public Midnight Ledger 9 State, edit private custodian balances/liabilities, run real compiled ZK presets (**Healthy Diversified**, **Undercollateralized <120%**, **Hidden Concentration Trap >40%**, **Fixed-Salt Replay**), and inspect SVG custodian concentration vs cap.
-2. **Covenant Policy & Adversarial Self-Tests**: Execute `tightenCovenantPolicy()` and run an adversarial **Rogue Key Attack Simulation** verifying Compact rejects unauthorized secret keys without mutating on-chain state.
-3. **Selective Auditor Disclosure & Independent Verifier**: Grant an epoch-scoped disclosure entry to a specific regulator/auditor, then cryptographically verify an off-chain private audit packet against the public ledger root & grant map using compiled pure circuits.
-4. **Compact Source, ZKIR & Lace Connector**: View full compiled `zero_covenant.compact`, real `.zkir` instruction counts & `.verifier` SHA-256 hashes, detect `window.midnight.mnLace`, and export Preprod deployment bundles.
+1. **Isolated Per-Visitor Sessions & Zero-Leakage Boundary**: Each browser session initializes via `POST /api/v1/session/init` with a CSPRNG 32-byte `deskSecret` and `X-Session-Token` auth. `GET /api/v1/session` returns strictly public ledger state (0 balances, 0 liabilities, 0 salts, 0 key bytes).
+2. **Dual-Ledger Proof Studio**: Edit browser-local private custodian balances/liabilities, execute compiled ZK presets (**Healthy Diversified**, **Undercollateralized <120%**, **Concentration Trap >40%**, **Cross-Epoch Salt Replay**), and inspect SVG custodian concentration vs cap.
+3. **Monotonic Covenant Governance & Adversarial Tests**: Tighten on-chain risk caps, test rejection of forbidden loosening (`100%/100%`) or impossible `<25%` caps, and run an authenticated **Rogue Key Attack Simulation** verified specifically against `"Unauthorized desk secret"`.
+4. **Historical Selective Auditor Disclosure & Independent Verifier**: Issue epoch-scoped one-way disclosure grants, advance across multiple epochs, and verify ANY historical epoch against both on-chain `epochRoots[epoch]` and `auditorGrants` (tampered historical balances are rejected immediately).
+5. **Compact Source, ZKIR & Lace Connector**: Inspect full `zero_covenant.compact`, real `.zkir` instruction counts & `.verifier` SHA-256 hashes, detect `window.midnight.mnLace`, and export Midnight artifact manifests.
 
 ---
 
@@ -64,17 +67,17 @@ All circuits in [`contract/src/zero_covenant.compact`](./contract/src/zero_coven
 ### Commands
 
 ```bash
-npm install --registry=https://registry.npmjs.org
+npm install
 npm run typecheck    # TypeScript strict check across contract + server + React client
-npm test             # Executes 10 Vitest specs across Compact Ledger 9 transitions + Hono HTTP API
+npm test             # Executes 14 Vitest specs (9 Compact Ledger 9 + 5 HTTP/privacy API)
 npm run build        # Production Vite bundle -> dist/client
 npm run start        # Serves compiled SPA + Ledger 9 runtime API on http://127.0.0.1:8790
 ```
 
-To recompile the Compact contract cleanly:
+To recompile the Compact contract cleanly (with `compactc` on `PATH`):
 
 ```bash
-compactc contract/src/zero_covenant.compact contract/src/managed/zero_covenant
+npm run compact
 ```
 
 ---
