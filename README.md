@@ -82,6 +82,14 @@ npm run compact
 
 ---
 
+## Execution Mode & Trust Model (Transparent Disclosure)
+
+- **Compiled Compact Runtime (Off-Chain Ledger 9 Simulator):** All 8 circuits in `contract/src/zero_covenant.compact` are compiled with official `compactc 0.36.1` (reproducible byte-for-byte with full ZKIR & BLS12-381 verifier keys, no `--skip-zk`). The live web demo executes the compiled contract transitions inside Midnight's `@midnight-ntwrk/compact-runtime@0.21.0` & `@midnight-ntwrk/onchain-runtime-v4@4.0.2` Ledger 9 WASM simulator without broadcasting live on-chain Midnight Preview proofs (Preview faucet currently requires interactive Turnstile verification).
+- **Privacy & Witness Boundary:** In the web demo, browser-entered private witnesses are posted over TLS to the isolated per-session simulator (`X-Session-Token` authenticated), immediately scrubbed from memory after each circuit transition, and **never** returned on public `GET /api/v1/session` (even private rejection reasons are redacted from public history logs). In production on Midnight, the desk runs the local Midnight Proof Server (`http://127.0.0.1:6300`) so witnesses never leave the institution's enclave.
+- **Custodian Balance Provenance:** The Wave 3 circuit verifies reserve coverage, concentration caps, nullifier uniqueness, and root-bound selective disclosure over desk-provided witnesses; cryptographic custodian attestations (MPC / TLSNotary / Fireblocks signed feeds) are slated for Milestone 2.
+
+---
+
 ## Documentation
 
 - [Pitch Deck](./docs/PITCH_DECK.md)

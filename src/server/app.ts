@@ -38,8 +38,38 @@ function parseUint64(value: unknown, field: string): bigint {
   throw new Error(`Invalid Uint<64> for ${field}`);
 }
 
+const INIT_RATE_WINDOW_MS = 60_000;
+const INIT_RATE_MAX_PER_IP = 25;
+const initRateByIp = new Map<string, number[]>();
+
+function checkInitRateLimit(ip: string): boolean {
+  if (!ip) return true;
+  const now = Date.now();
+  const prev = (initRateByIp.get(ip) ?? []).filter((ts) => now - ts < INIT_RATE_WINDOW_MS);
+  if (prev.length >= INIT_RATE_MAX_PER_IP) {
+    initRateByIp.set(ip, prev);
+    return false;
+  }
+  prev.push(now);
+  initRateByIp.set(ip, prev);
+  if (initRateByIp.size > 500) initRateByIp.clear();
+  return true;
+}
+
 export function createZeroCovenantApp(): Hono {
   const app = new Hono();
+
+  app.use("*", async (c, next) => {
+    await next();
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("X-Frame-Options", "DENY");
+    c.header("Referrer-Policy", "no-referrer");
+    c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+    );
+  });
 
   app.use(
     "/api/*",
@@ -58,7 +88,7 @@ export function createZeroCovenantApp(): Hono {
     return c.json({
       ok: true,
       service: "ZeroCovenant",
-      network: "Midnight Ledger 9 WASM Runtime (Local Compact Prover)",
+      network: "Midnight Ledger 9 WASM Simulator (Compiled compactc 0.36.1 Runtime — Off-Chain Execution)",
       compilerVersion: artifacts.compilerVersion,
       languageVersion: artifacts.languageVersion,
       runtimeVersion: artifacts.runtimeVersion,
@@ -96,6 +126,11 @@ export function createZeroCovenantApp(): Hono {
   });
 
   app.post("/api/v1/session/init", async (c) => {
+    const clientIp =
+      c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+    if (!checkInitRateLimit(clientIp)) {
+      return c.json({ ok: false, error: "Too many session initializations. Please retry in 60 seconds." }, 429);
+    }
     const body = (await c.req.json().catch(() => ({}))) as { deskName?: string };
     const created = await initIsolatedSession(body.deskName);
     return c.json({

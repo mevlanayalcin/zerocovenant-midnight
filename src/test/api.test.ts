@@ -35,9 +35,12 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
     return (await res.json()) as InitResponse;
   }
 
-  it("exposes health and compiled Compact ZKIR/verifier metadata without secret-tag witness", async () => {
+  it("exposes health, security headers, and compiled Compact ZKIR/verifier metadata without secret-tag witness", async () => {
     const healthRes = await app.request("/health");
     expect(healthRes.status).toBe(200);
+    expect(healthRes.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(healthRes.headers.get("x-frame-options")).toBe("DENY");
+    expect(healthRes.headers.get("strict-transport-security")).toContain("max-age=");
     const health = (await healthRes.json()) as { ok: boolean; compilerVersion: string; circuits: number };
     expect(health.ok).toBe(true);
     expect(health.compilerVersion).toBe("0.36.1");
@@ -151,6 +154,12 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
     expect(trapRes.status).toBe(422);
     const trapJson = (await trapRes.json()) as { ok: boolean; error: string };
     expect(trapJson.error).toContain("concentration");
+
+    // Verify public GET /api/v1/session redacts private-witness rejection reasons (zero side-channel leakage)
+    const pubAfterReject = await app.request(`/api/v1/session?sessionId=${encodeURIComponent(created.sessionId)}`);
+    const pubAfterText = await pubAfterReject.text();
+    expect(pubAfterText).not.toContain("Custodian 0");
+    expect(pubAfterText).not.toContain("exceeds covenant cap");
 
     const loosenRes = await app.request("/api/v1/policy/tighten", {
       method: "POST",

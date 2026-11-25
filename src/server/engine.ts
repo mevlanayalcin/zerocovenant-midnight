@@ -256,14 +256,15 @@ class ManagedDeskSession {
     } catch (err) {
       const durationMs = Math.round(performance.now() - t0);
       const msg = extractErrorMessage(err);
+      // Redact specific private-witness failure reason from public GET /api/v1/session history
+      // so observers cannot infer which custodian breached or whether liabilities were 0.
       const ev = this.pushEvent({
         circuit: "attestSolvency",
         status: "REJECTED",
         epochBefore: epochBefore.toString(),
         epochAfter: this.simulator.getLedger().epoch.toString(),
         durationMs,
-        nullifierHex: expectedNullifier,
-        message: `Compact circuit assertion rejected state transition: ${msg}`
+        message: "Compact circuit assertion rejected private witness transition (specific reason returned only to authenticated desk)."
       });
       return { ok: false, error: msg, event: ev, state: this.publicSnapshot(), committedSaltHex };
     } finally {
