@@ -41,10 +41,17 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
     expect(healthRes.headers.get("x-content-type-options")).toBe("nosniff");
     expect(healthRes.headers.get("x-frame-options")).toBe("DENY");
     expect(healthRes.headers.get("strict-transport-security")).toContain("max-age=");
-    const health = (await healthRes.json()) as { ok: boolean; compilerVersion: string; circuits: number };
+    const health = (await healthRes.json()) as {
+      ok: boolean;
+      compilerVersion: string;
+      circuits: number;
+      previewDeployment?: { contractAddress: string; deployBlockHeight: number } | null;
+    };
     expect(health.ok).toBe(true);
     expect(health.compilerVersion).toBe("0.36.1");
     expect(health.circuits).toBeGreaterThanOrEqual(8);
+    expect(health.previewDeployment?.contractAddress).toMatch(/^[0-9a-f]{64}$/);
+    expect(health.previewDeployment?.deployBlockHeight).toBeGreaterThan(200_000);
 
     const artRes = await app.request("/api/v1/artifacts");
     expect(artRes.status).toBe(200);

@@ -1,0 +1,16 @@
+{
+  "network": "preview",
+  "rpcUrl": "https://rpc.preview.midnight.network",
+  "indexerUrl": "https://indexer.preview.midnight.network/api/v4/graphql",
+  "faucetTxId": "00b1e6eec627bbcd91670bd6d78cd8e30856e36f13e36e01d067a0040be3810e3b",
+  "deployerAddress": "mn_addr_preview1srk6r6a6s8257rycfw670sz6qljdmckfeem72wfsxvncsc74f94syu46vh",
+  "contractAddress": "efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25",
+  "entityCommitmentHex": "0x6f81df981a9369333dc83eb07e0600077cf0dac3dfe098029fee1911f8e2f877",
+  "deployTxId": "00069370adc4a0e602e2b0b3178901d5bfbd78513d9b9b0bc8cbaa757e00790396",
+  "deployBlockHeight": 271364,
+  "attestTxId": "002d90eaffec912977287b85207c5c654c69cb95a9a02165144dbcb1bf88c132cf",
+  "attestBlockHeight": 271369,
+  "grantTxId": "00399668528b841316b3f9d8a0fbd739f2985c3da2f1d8003448b8dac4e8a8ce1e",
+  "grantBlockHeight": 271373,
+  "deployedAt": "2026-11-25T22:13:07.980Z"
+}

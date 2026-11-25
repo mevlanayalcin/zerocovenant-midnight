@@ -131,6 +131,34 @@ interface VerificationResponse {
   auditedMaxCustodianPct: string;
 }
 
+interface PreviewOnChainStatus {
+  deployed: boolean;
+  deployment: {
+    network: string;
+    rpcUrl: string;
+    indexerUrl: string;
+    faucetTxId: string;
+    deployerAddress: string;
+    contractAddress: string;
+    entityCommitmentHex: string;
+    deployTxId: string;
+    deployBlockHeight: number;
+    attestTxId: string;
+    attestBlockHeight: number;
+    grantTxId: string;
+    grantBlockHeight: number;
+    deployedAt: string;
+  } | null;
+  liveIndexer: {
+    reachable: boolean;
+    latestBlockHeight: number | null;
+    contractActionType: string | null;
+    stateBytesLength: number | null;
+    chainTxHash: string | null;
+    error?: string;
+  };
+}
+
 type TabId = "studio" | "covenant" | "auditor" | "artifacts";
 
 const VAULT_STORAGE_KEY = "zerocovenant_local_vault_v2";
@@ -188,6 +216,7 @@ export default function App() {
   const [sessionToken, setSessionToken] = useState<string>("");
   const [session, setSession] = useState<PublicDeskSessionState | null>(null);
   const [artifacts, setArtifacts] = useState<CompiledArtifacts | null>(null);
+  const [previewChain, setPreviewChain] = useState<PreviewOnChainStatus | null>(null);
   const [localEpochPackets, setLocalEpochPackets] = useState<Record<string, LocalEpochPacket>>({});
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -285,9 +314,22 @@ export default function App() {
     persistSeed(json.sessionId, json.sessionToken, json.initialClientSeed, json.session);
   }, [persistSeed]);
 
+  const loadPreviewOnChain = useCallback(async () => {
+    try {
+      const r = await fetch("/api/v1/preview/onchain");
+      if (r.ok) {
+        const j = (await r.json()) as PreviewOnChainStatus;
+        setPreviewChain(j);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
+      void loadPreviewOnChain();
       const artPromise = fetch("/api/v1/artifacts").then((r) => r.json() as Promise<CompiledArtifacts>);
       const saved = readStoredVault();
       let restored = false;
@@ -327,7 +369,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [applyPublicSession, initializeFreshSession]);
+  }, [applyPublicSession, initializeFreshSession, loadPreviewOnChain]);
 
   useEffect(() => {
     void loadAll();
@@ -792,6 +834,64 @@ export default function App() {
             </p>
           </div>
         </section>
+
+        {/* Live Midnight Preview On-Chain Proof Banner */}
+        {previewChain?.deployed && previewChain.deployment && (
+          <section className="mb-6 rounded-xl border border-emerald-500/35 bg-gradient-to-r from-emerald-500/10 via-[#0b101b] to-indigo-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                  Live On-Chain Deployment · Midnight Preview Testnet (Ledger 9)
+                </span>
+                {previewChain.liveIndexer.reachable && (
+                  <span className="rounded border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-200">
+                    INDEXER v4 VERIFIED · BLOCK #{previewChain.liveIndexer.latestBlockHeight?.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadPreviewOnChain()}
+                className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/20"
+              >
+                Re-Verify Preview Indexer
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 font-mono text-[11px] text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                <div className="text-[10px] text-slate-500">Contract Address (Preview)</div>
+                <div className="truncate font-semibold text-white" title={previewChain.deployment.contractAddress}>
+                  {shortHex(previewChain.deployment.contractAddress, 14, 10)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                <div className="text-[10px] text-slate-500">
+                  Deploy ZK Tx · Block #{previewChain.deployment.deployBlockHeight}
+                </div>
+                <div className="truncate text-indigo-300" title={previewChain.deployment.deployTxId}>
+                  {shortHex(previewChain.deployment.deployTxId, 14, 10)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                <div className="text-[10px] text-slate-500">
+                  attestSolvency() ZK Proof · Block #{previewChain.deployment.attestBlockHeight}
+                </div>
+                <div className="truncate text-emerald-300" title={previewChain.deployment.attestTxId}>
+                  {shortHex(previewChain.deployment.attestTxId, 14, 10)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                <div className="text-[10px] text-slate-500">
+                  grantAuditorDisclosure() · Block #{previewChain.deployment.grantBlockHeight}
+                </div>
+                <div className="truncate text-cyan-300" title={previewChain.deployment.grantTxId}>
+                  {shortHex(previewChain.deployment.grantTxId, 14, 10)}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Navigation Tabs */}
         <nav className="mb-6 flex flex-wrap gap-2 border-b border-slate-800 pb-3">

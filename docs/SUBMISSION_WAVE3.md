@@ -4,6 +4,11 @@
 **License:** Apache-2.0 (`LICENSE`)
 **Public GitHub Repo (tagged `midnightntwrk`):** `https://github.com/mevlanayalcin/zerocovenant-midnight`
 **Live HTTPS Demo:** `https://zerocovenant.mevlanayalcin.com.tr`
+**Live Midnight Preview Contract Address (Ledger 9):** `efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25`
+- **Deploy ZK Tx (Block `#271364`):** `00069370adc4a0e602e2b0b3178901d5bfbd78513d9b9b0bc8cbaa757e00790396`
+- **On-Chain ZK `attestSolvency()` Tx (Block `#271369`):** `002d90eaffec912977287b85207c5c654c69cb95a9a02165144dbcb1bf88c132cf`
+- **On-Chain ZK `grantAuditorDisclosure()` Tx (Block `#271373`):** `00399668528b841316b3f9d8a0fbd739f2985c3da2f1d8003448b8dac4e8a8ce1e`
+- **Live Indexer v4 Verification API:** `https://zerocovenant.mevlanayalcin.com.tr/api/v1/preview/onchain`
 
 ---
 

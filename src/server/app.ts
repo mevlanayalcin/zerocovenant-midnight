@@ -6,6 +6,7 @@ import {
   initIsolatedSession,
   resetAuthenticatedSession
 } from "./engine.js";
+import { loadPreviewDeployment, queryLivePreviewContractState } from "./preview-chain.js";
 
 const U64_MAX = 18_446_744_073_709_551_615n;
 
@@ -85,16 +86,36 @@ export function createZeroCovenantApp(): Hono {
 
   app.get("/health", async (c) => {
     const artifacts = loadCompiledArtifacts();
+    const preview = loadPreviewDeployment();
     return c.json({
       ok: true,
       service: "ZeroCovenant",
-      network: "Midnight Ledger 9 WASM Simulator (Compiled compactc 0.36.1 Runtime — Off-Chain Execution)",
+      network: preview
+        ? "Midnight Preview Testnet (On-Chain Deployed + Ledger 9 WASM Interactive Studio)"
+        : "Midnight Ledger 9 WASM Simulator (Compiled compactc 0.36.1 Runtime — Off-Chain Execution)",
       compilerVersion: artifacts.compilerVersion,
       languageVersion: artifacts.languageVersion,
       runtimeVersion: artifacts.runtimeVersion,
       circuits: artifacts.circuits.length,
+      previewDeployment: preview
+        ? {
+            network: preview.network,
+            contractAddress: preview.contractAddress,
+            deployTxId: preview.deployTxId,
+            deployBlockHeight: preview.deployBlockHeight,
+            attestTxId: preview.attestTxId,
+            attestBlockHeight: preview.attestBlockHeight,
+            grantTxId: preview.grantTxId,
+            grantBlockHeight: preview.grantBlockHeight
+          }
+        : null,
       timestamp: new Date().toISOString()
     });
+  });
+
+  app.get("/api/v1/preview/onchain", async (c) => {
+    const res = await queryLivePreviewContractState();
+    return c.json({ ok: true, ...res });
   });
 
   app.get("/api/v1/artifacts", (c) => {
@@ -112,6 +133,7 @@ export function createZeroCovenantApp(): Hono {
       },
       paths: {
         "/health": { get: { summary: "Service and Midnight Compact compiler health" } },
+        "/api/v1/preview/onchain": { get: { summary: "Live GraphQL verification of deployed ZeroCovenant contract on Midnight Preview Indexer v4" } },
         "/api/v1/artifacts": { get: { summary: "Compiled Compact source, ZKIR instruction breakdown, and verifier key hashes" } },
         "/api/v1/session/init": { post: { summary: "Create an isolated per-visitor session with CSPRNG deskSecret and auth token" } },
         "/api/v1/session": { get: { summary: "Inspect PUBLIC Midnight ledger snapshot only (zero private witness fields)" } },

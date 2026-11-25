@@ -12,12 +12,26 @@
 
 ---
 
-## Live Deployment & Repository
+## Live Deployment, On-Chain Preview Proofs & Repository
 
 - **Live HTTPS App & API:** [https://zerocovenant.mevlanayalcin.com.tr](https://zerocovenant.mevlanayalcin.com.tr)
+- **Live On-Chain Verifier Endpoint:** [`GET /api/v1/preview/onchain`](https://zerocovenant.mevlanayalcin.com.tr/api/v1/preview/onchain) (queries `https://indexer.preview.midnight.network/api/v4/graphql` live)
 - **GitHub Repository:** [https://github.com/mevlanayalcin/zerocovenant-midnight](https://github.com/mevlanayalcin/zerocovenant-midnight)
 - **Health Endpoint:** [`GET /health`](https://zerocovenant.mevlanayalcin.com.tr/health)
 - **OpenAPI 3.1 Spec:** [`GET /api/v1/openapi.json`](https://zerocovenant.mevlanayalcin.com.tr/api/v1/openapi.json)
+
+### Verified Midnight Preview Testnet Deployment (Ledger 9 · `midnightntwrk/proof-server:9.0.2`)
+
+| Artifact / On-Chain Proof | Value |
+| :--- | :--- |
+| **Network** | Midnight Preview (`https://rpc.preview.midnight.network` · Indexer v4 `https://indexer.preview.midnight.network/api/v4/graphql`) |
+| **Contract Address** | `efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25` |
+| **Deploy ZK Tx (Block `#271364`)** | `00069370adc4a0e602e2b0b3178901d5bfbd78513d9b9b0bc8cbaa757e00790396` |
+| **On-Chain ZK `attestSolvency()` Epoch #1 (Block `#271369`)** | `002d90eaffec912977287b85207c5c654c69cb95a9a02165144dbcb1bf88c132cf` |
+| **On-Chain ZK `grantAuditorDisclosure()` Epoch #1 (Block `#271373`)** | `00399668528b841316b3f9d8a0fbd739f2985c3da2f1d8003448b8dac4e8a8ce1e` |
+| **Entity Commitment** | `0x6f81df981a9369333dc83eb07e0600077cf0dac3dfe098029fee1911f8e2f877` |
+| **Deployer Address** | `mn_addr_preview1srk6r6a6s8257rycfw670sz6qljdmckfeem72wfsxvncsc74f94syu46vh` |
+| **Deployment Record** | [`contract/preview-deployment.json`](./contract/preview-deployment.json) |
 
 ---
 
@@ -84,8 +98,8 @@ npm run compact
 
 ## Execution Mode & Trust Model (Transparent Disclosure)
 
-- **Compiled Compact Runtime (Off-Chain Ledger 9 Simulator):** All 8 circuits in `contract/src/zero_covenant.compact` are compiled with official `compactc 0.36.1` (reproducible byte-for-byte with full ZKIR & BLS12-381 verifier keys, no `--skip-zk`). The live web demo executes the compiled contract transitions inside Midnight's `@midnight-ntwrk/compact-runtime@0.21.0` & `@midnight-ntwrk/onchain-runtime-v4@4.0.2` Ledger 9 WASM simulator without broadcasting live on-chain Midnight Preview proofs (Preview faucet currently requires interactive Turnstile verification).
-- **Privacy & Witness Boundary:** In the web demo, browser-entered private witnesses are posted over TLS to the isolated per-session simulator (`X-Session-Token` authenticated), immediately scrubbed from memory after each circuit transition, and **never** returned on public `GET /api/v1/session` (even private rejection reasons are redacted from public history logs). In production on Midnight, the desk runs the local Midnight Proof Server (`http://127.0.0.1:6300`) so witnesses never leave the institution's enclave.
+- **Live Midnight Preview Deployment + Interactive Ledger 9 Studio:** All 8 circuits in `contract/src/zero_covenant.compact` are compiled with official `compactc 0.36.1` (reproducible byte-for-byte with full ZKIR & BLS12-381 verifier keys, no `--skip-zk`), deployed live on **Midnight Preview** (`efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25`, Block `#271364`), and exercised on-chain with real ZK proofs generated via `midnightntwrk/proof-server:9.0.2` (`attestSolvency()` Block `#271369` + `grantAuditorDisclosure()` Block `#271373`, verifiable live via `GET /api/v1/preview/onchain`). For sub-second interactive judging without requiring a local Proof Server or faucet wait, the web studio also runs the identical compiled Ledger 9 WASM contract per isolated session.
+- **Privacy & Witness Boundary:** In the interactive web studio, browser-entered private witnesses are posted over TLS to the isolated per-session runtime (`X-Session-Token` authenticated), immediately scrubbed from memory after each circuit transition, and **never** returned on public `GET /api/v1/session` (even private rejection reasons are redacted from public history logs). On-chain deployments generate proofs locally via the institutional Midnight Proof Server (`http://127.0.0.1:6300`) so private balances never leave the enclave.
 - **Custodian Balance Provenance:** The Wave 3 circuit verifies reserve coverage, concentration caps, nullifier uniqueness, and root-bound selective disclosure over desk-provided witnesses; cryptographic custodian attestations (MPC / TLSNotary / Fireblocks signed feeds) are slated for Milestone 2.
 
 ---
