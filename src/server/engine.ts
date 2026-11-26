@@ -244,7 +244,7 @@ class ManagedDeskSession {
         durationMs,
         reserveRootHex: res.rootHex,
         nullifierHex: expectedNullifier,
-        message: `Epoch ${epochBefore.toString()} solvency + 4-custodian concentration covenant verified in ZK without exposing asset or liability figures.`
+        message: `Epoch ${epochBefore.toString()} solvency + 4-custodian concentration covenant verified in compiled Compact off-chain simulator (no ZK proof generated in studio) without exposing asset or liability figures to public state.`
       });
       return {
         ok: true,
@@ -256,16 +256,19 @@ class ManagedDeskSession {
     } catch (err) {
       const durationMs = Math.round(performance.now() - t0);
       const msg = extractErrorMessage(err);
-      // Redact specific private-witness failure reason from public GET /api/v1/session history
-      // so observers cannot infer which custodian breached or whether liabilities were 0.
-      const ev = this.pushEvent({
+      // Reverted transitions do NOT mutate public ledger state or append to public GET /api/v1/session history,
+      // eliminating even existence-of-failure side channels from public observers.
+      const ev: CircuitEventRecord = {
+        id: `rej_${Date.now().toString(36)}`,
+        timestamp: new Date().toISOString(),
         circuit: "attestSolvency",
         status: "REJECTED",
         epochBefore: epochBefore.toString(),
         epochAfter: this.simulator.getLedger().epoch.toString(),
         durationMs,
-        message: "Compact circuit assertion rejected private witness transition (specific reason returned only to authenticated desk)."
-      });
+        message: msg,
+        privateFieldsLeaked: 0
+      };
       return { ok: false, error: msg, event: ev, state: this.publicSnapshot(), committedSaltHex };
     } finally {
       this.scrubTransientWitnesses();
@@ -409,7 +412,7 @@ class ManagedDeskSession {
         epochBefore: epochBefore.toString(),
         epochAfter: nextLedger.epoch.toString(),
         durationMs,
-        message: `On-chain risk covenant tightened: Min Solvency ${formatPctFromBps(input.minRatioBps)}, Max Single Custodian ${formatPctFromBps(input.maxSingleBps)}. Re-attestation required (lastSolvencyVerified reset to false).`
+        message: `Simulated ledger risk covenant tightened: Min Solvency ${formatPctFromBps(input.minRatioBps)}, Max Single Custodian ${formatPctFromBps(input.maxSingleBps)}. Re-attestation required (lastSolvencyVerified reset to false).`
       });
       return { ok: true, event: ev, state: this.publicSnapshot() };
     } catch (err) {

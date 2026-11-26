@@ -35,22 +35,37 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
     return (await res.json()) as InitResponse;
   }
 
-  it("exposes health, security headers, and compiled Compact ZKIR/verifier metadata without secret-tag witness", async () => {
+  it("exposes health, security headers, HTTPS redirect, honest simulator mode, and compiled Compact ZKIR/verifier metadata", async () => {
+    const httpRedirect = await app.request("http://zerocovenant.mevlanayalcin.com.tr/health", {
+      headers: { "X-Forwarded-Proto": "http", Host: "zerocovenant.mevlanayalcin.com.tr" }
+    });
+    expect(httpRedirect.status).toBe(301);
+    expect(httpRedirect.headers.get("location")).toBe("https://zerocovenant.mevlanayalcin.com.tr/health");
+
     const healthRes = await app.request("/health");
     expect(healthRes.status).toBe(200);
     expect(healthRes.headers.get("x-content-type-options")).toBe("nosniff");
     expect(healthRes.headers.get("x-frame-options")).toBe("DENY");
     expect(healthRes.headers.get("strict-transport-security")).toContain("max-age=");
+    const csp = healthRes.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("script-src 'self';");
+    expect(csp).toContain("https://fonts.googleapis.com");
+    expect(csp).toContain("https://fonts.gstatic.com");
     const health = (await healthRes.json()) as {
       ok: boolean;
+      studioExecutionMode: string;
+      studioGeneratesZkProofs: boolean;
       compilerVersion: string;
       circuits: number;
-      previewDeployment?: { contractAddress: string; deployBlockHeight: number } | null;
+      previewDeployment?: { contractAddress: string; deployTxHash: string; deployBlockHeight: number } | null;
     };
     expect(health.ok).toBe(true);
+    expect(health.studioExecutionMode).toBe("offchain-compact-simulator-no-proofs");
+    expect(health.studioGeneratesZkProofs).toBe(false);
     expect(health.compilerVersion).toBe("0.36.1");
     expect(health.circuits).toBeGreaterThanOrEqual(8);
     expect(health.previewDeployment?.contractAddress).toMatch(/^[0-9a-f]{64}$/);
+    expect(health.previewDeployment?.deployTxHash).toMatch(/^[0-9a-f]{64}$/);
     expect(health.previewDeployment?.deployBlockHeight).toBeGreaterThan(200_000);
 
     const artRes = await app.request("/api/v1/artifacts");
@@ -148,6 +163,9 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
   it("rejects concentration trap, policy loosening, and rogue-key attacks via Compact circuits", async () => {
     const created = await initDesk();
 
+    const pubBeforeReject = await app.request(`/api/v1/session?sessionId=${encodeURIComponent(created.sessionId)}`);
+    const historyLenBefore = ((await pubBeforeReject.json()) as { session: { history: unknown[] } }).session.history.length;
+
     const trapRes = await app.request("/api/v1/attest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": created.sessionToken },
@@ -162,9 +180,12 @@ describe("ZeroCovenant HTTP API, Privacy Boundary & Compact Runtime Integration"
     const trapJson = (await trapRes.json()) as { ok: boolean; error: string };
     expect(trapJson.error).toContain("concentration");
 
-    // Verify public GET /api/v1/session redacts private-witness rejection reasons (zero side-channel leakage)
+    // Verify public GET /api/v1/session omits failed attestation attempts entirely (zero existence or reason leakage)
     const pubAfterReject = await app.request(`/api/v1/session?sessionId=${encodeURIComponent(created.sessionId)}`);
     const pubAfterText = await pubAfterReject.text();
+    const pubAfterParsed = JSON.parse(pubAfterText) as { session: { history: Array<{ status: string }> } };
+    expect(pubAfterParsed.session.history.length).toBe(historyLenBefore);
+    expect(pubAfterParsed.session.history.some((e) => e.status === "REJECTED")).toBe(false);
     expect(pubAfterText).not.toContain("Custodian 0");
     expect(pubAfterText).not.toContain("exceeds covenant cap");
 

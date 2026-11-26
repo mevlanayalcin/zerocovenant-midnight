@@ -142,11 +142,20 @@ interface PreviewOnChainStatus {
     contractAddress: string;
     entityCommitmentHex: string;
     deployTxId: string;
+    deployTxHash?: string;
     deployBlockHeight: number;
     attestTxId: string;
+    attestTxHash?: string;
     attestBlockHeight: number;
     grantTxId: string;
+    grantTxHash?: string;
     grantBlockHeight: number;
+    tightenTxId?: string;
+    tightenTxHash?: string;
+    tightenBlockHeight?: number;
+    attest2TxId?: string;
+    attest2TxHash?: string;
+    attest2BlockHeight?: number;
     deployedAt: string;
   } | null;
   liveIndexer: {
@@ -390,8 +399,8 @@ export default function App() {
       detected,
       connected: false,
       label: detected
-        ? `Lace v${w.midnight?.mnLace?.apiVersion ?? "3"} Detected`
-        : "No Browser Lace — Ledger 9 WASM Active"
+        ? `Lace v${w.midnight?.mnLace?.apiVersion ?? "3"} Detected (UI Detection Only)`
+        : "Lace Not Installed — Off-Chain Simulator"
     });
   }, []);
 
@@ -402,7 +411,7 @@ export default function App() {
     if (!w.midnight?.mnLace?.enable) {
       setBanner({
         kind: "info",
-        text: "Lace browser extension is not installed in this browser. All Compact ZK transitions run live against the compiled Ledger 9 WASM runtime."
+        text: "Lace browser extension is not detected. This web studio runs the compiled Compact Ledger 9 contract in an off-chain server simulator (no ZK proofs generated in the browser). Real on-chain ZK proofs are executed via scripts/deploy-preview.mjs + midnightntwrk/proof-server:9.0.2."
       });
       return;
     }
@@ -479,12 +488,12 @@ export default function App() {
         writeStoredVault({ sessionId, sessionToken, epochPackets: nextPackets });
         setBanner({
           kind: "ok",
-          text: `Epoch #${json.attestedEpoch} ZK Attestation Verified -> Root ${shortHex(json.event?.reserveRootHex ?? "")} anchored in epochRoots (0 private bytes leaked).`
+          text: `Epoch #${json.attestedEpoch} Compact Simulator Transition Verified (Off-Chain, No ZK Proof) -> Root ${shortHex(json.event?.reserveRootHex ?? "")} anchored in simulated epochRoots (0 private bytes exposed on public GET).`
         });
       } else {
         setBanner({
           kind: "err",
-          text: `Compact Circuit Rejected Proof: ${json.error ?? "Assertion failed"} — On-chain ledger remained unchanged.`
+          text: `Compact Circuit Assertion Rejected: ${json.error ?? "Assertion failed"} — Simulated ledger state remained unchanged.`
         });
       }
     } catch (err) {
@@ -539,7 +548,7 @@ export default function App() {
       setBanner({
         kind: json.ok ? "ok" : "err",
         text: json.ok
-          ? `On-chain risk covenant tightened via tightenCovenantPolicy(). Prior solvency flag reset to PENDING until fresh proof.`
+          ? `Simulated risk covenant tightened via tightenCovenantPolicy(). Prior solvency flag reset to PENDING until fresh attestation.`
           : `Policy update rejected: ${json.error}`
       });
     } finally {
@@ -645,7 +654,8 @@ export default function App() {
   function downloadArtifactManifest() {
     const manifest = {
       protocol: "ZeroCovenant",
-      runtimeMode: "Midnight Ledger 9 WASM Local Prover",
+      studioRuntimeMode: "Off-Chain Compiled Compact Ledger 9 Simulator (No Browser ZK Proofs)",
+      onChainPreviewContract: previewChain?.deployment?.contractAddress ?? null,
       networkTarget: "midnight-preview",
       compiler: artifacts?.compilerVersion ?? "0.36.1",
       languageVersion: artifacts?.languageVersion ?? "0.28.0",
@@ -693,11 +703,11 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-base font-bold tracking-tight text-white">ZeroCovenant</span>
                 <span className="rounded border border-indigo-500/40 bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-indigo-300">
-                  COMPACT v{artifacts?.languageVersion ?? "0.28.0"} · LEDGER 9 WASM
+                  COMPACT v{artifacts?.languageVersion ?? "0.28.0"} · OFF-CHAIN SIMULATOR (NO STUDIO PROOFS)
                 </span>
                 {sessionId && (
                   <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">
-                    ISOLATED DESK · {sessionId.slice(0, 12)}
+                    ISOLATED SESSION · {sessionId.slice(0, 12)}
                   </span>
                 )}
               </div>
@@ -867,29 +877,54 @@ export default function App() {
               </div>
               <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
                 <div className="text-[10px] text-slate-500">
-                  Deploy ZK Tx · Block #{previewChain.deployment.deployBlockHeight}
+                  Deploy ZK Tx Hash · Block #{previewChain.deployment.deployBlockHeight}
                 </div>
-                <div className="truncate text-indigo-300" title={previewChain.deployment.deployTxId}>
-                  {shortHex(previewChain.deployment.deployTxId, 14, 10)}
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
-                <div className="text-[10px] text-slate-500">
-                  attestSolvency() ZK Proof · Block #{previewChain.deployment.attestBlockHeight}
-                </div>
-                <div className="truncate text-emerald-300" title={previewChain.deployment.attestTxId}>
-                  {shortHex(previewChain.deployment.attestTxId, 14, 10)}
+                <div className="truncate text-indigo-300" title={previewChain.deployment.deployTxHash ?? previewChain.deployment.deployTxId}>
+                  {shortHex(previewChain.deployment.deployTxHash ?? previewChain.deployment.deployTxId, 14, 10)}
                 </div>
               </div>
               <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
                 <div className="text-[10px] text-slate-500">
-                  grantAuditorDisclosure() · Block #{previewChain.deployment.grantBlockHeight}
+                  attestSolvency() ZK Hash · Block #{previewChain.deployment.attestBlockHeight}
                 </div>
-                <div className="truncate text-cyan-300" title={previewChain.deployment.grantTxId}>
-                  {shortHex(previewChain.deployment.grantTxId, 14, 10)}
+                <div className="truncate text-emerald-300" title={previewChain.deployment.attestTxHash ?? previewChain.deployment.attestTxId}>
+                  {shortHex(previewChain.deployment.attestTxHash ?? previewChain.deployment.attestTxId, 14, 10)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                <div className="text-[10px] text-slate-500">
+                  grantAuditorDisclosure() Hash · Block #{previewChain.deployment.grantBlockHeight}
+                </div>
+                <div className="truncate text-cyan-300" title={previewChain.deployment.grantTxHash ?? previewChain.deployment.grantTxId}>
+                  {shortHex(previewChain.deployment.grantTxHash ?? previewChain.deployment.grantTxId, 14, 10)}
                 </div>
               </div>
             </div>
+            {previewChain.deployment.tightenTxHash && (
+              <div className="mt-2 grid grid-cols-1 gap-2 font-mono text-[11px] text-slate-300 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                  <div className="text-[10px] text-slate-500">
+                    tightenCovenantPolicy(125%/35%) ZK Hash · Block #{previewChain.deployment.tightenBlockHeight}
+                  </div>
+                  <div className="truncate text-amber-300" title={previewChain.deployment.tightenTxHash}>
+                    {shortHex(previewChain.deployment.tightenTxHash, 14, 10)}
+                  </div>
+                </div>
+                {previewChain.deployment.attest2TxHash && (
+                  <div className="rounded-lg border border-slate-800/80 bg-[#07090f]/80 px-3 py-2">
+                    <div className="text-[10px] text-slate-500">
+                      Re-Attest Epoch #2 ZK Hash · Block #{previewChain.deployment.attest2BlockHeight}
+                    </div>
+                    <div className="truncate text-emerald-300" title={previewChain.deployment.attest2TxHash}>
+                      {shortHex(previewChain.deployment.attest2TxHash, 14, 10)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-slate-400">
+              Above banner verifies the real on-chain Midnight Preview contract via Indexer v4 GraphQL. The interactive studio below runs an isolated <strong className="text-slate-200">off-chain compiled Compact simulator (no ZK proofs)</strong> for instant testing; private witness inputs are posted over HTTPS to <code className="font-mono text-slate-300">/api/v1/attest</code>, evaluated in ephemeral memory, and scrubbed immediately.
+            </p>
           </section>
         )}
 
@@ -936,7 +971,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <EyeOff className="h-4 w-4 text-emerald-400" />
                         <h2 className="text-sm font-bold text-white">
-                          Private Witness Vault (Browser-Local Only)
+                          Private Witness Inputs (Session Simulator — Posted Over HTTPS)
                         </h2>
                       </div>
                       <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
@@ -947,7 +982,7 @@ export default function App() {
                     {/* 1-click Scenarios */}
                     <div className="mb-4">
                       <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                        One-Click ZK Verification &amp; Rejection Scenarios
+                        One-Click Compact Circuit Simulation Scenarios (Off-Chain, No Proofs)
                       </p>
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <button
@@ -1084,8 +1119,8 @@ export default function App() {
                     >
                       <ShieldCheck className="h-4 w-4" />
                       {busyAction === "attest"
-                        ? "Executing Compact ZK Circuit..."
-                        : `Execute Compact Circuit attestSolvency() for Epoch #${pub?.epoch ?? "1"}`}
+                        ? "Simulating Compact Circuit..."
+                        : `Simulate Compact attestSolvency() for Epoch #${pub?.epoch ?? "1"} (Off-Chain)`}
                     </button>
                   </div>
 
@@ -1096,14 +1131,14 @@ export default function App() {
                   />
                 </div>
 
-                {/* RIGHT COLUMN: Public Midnight Ledger 9 State */}
+                {/* RIGHT COLUMN: Simulated Public Midnight Ledger 9 State */}
                 <div className="space-y-4 lg:col-span-6">
                   <div className="rounded-xl border border-indigo-500/30 bg-[#0b101b] p-5">
                     <div className="mb-4 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Unlock className="h-4 w-4 text-indigo-400" />
                         <h2 className="text-sm font-bold text-white">
-                          Public Midnight Ledger 9 State
+                          Simulated Public Ledger State (Off-Chain Session)
                         </h2>
                       </div>
                       <span className="rounded border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-indigo-300">
@@ -1337,7 +1372,7 @@ export default function App() {
 
                   <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-5">
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">
-                      On-Chain <code className="font-mono text-indigo-300">auditorGrants</code> Registry ({session?.grants.length ?? 0})
+                      Simulated <code className="font-mono text-indigo-300">auditorGrants</code> Registry ({session?.grants.length ?? 0})
                     </h3>
                     <div className="space-y-2">
                       {(session?.grants ?? []).map((g) => (
@@ -1348,7 +1383,7 @@ export default function App() {
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-indigo-300">{g.auditorLabel}</span>
                             <span className="font-mono text-[10px] text-emerald-300">
-                              Epoch #{g.targetEpoch} · ON-LEDGER
+                              Epoch #{g.targetEpoch} · SIMULATED LEDGER
                             </span>
                           </div>
                           <div className="mt-1 font-mono text-[10px] text-slate-400">
@@ -1371,7 +1406,7 @@ export default function App() {
                         Independent Auditor Cryptographic Verifier
                       </h2>
                       <p className="text-xs text-slate-400">
-                        Recomputes <code className="font-mono text-slate-200">computeReserveRoot</code>, <code className="font-mono text-slate-200">computeGrantKey</code>, and <code className="font-mono text-slate-200">computeDisclosureTag</code> and verifies EVERY historical epoch against on-chain <code className="font-mono text-slate-200">epochRoots[epoch]</code> &amp; <code className="font-mono text-slate-200">auditorGrants</code>.
+                        Recomputes <code className="font-mono text-slate-200">computeReserveRoot</code>, <code className="font-mono text-slate-200">computeGrantKey</code>, and <code className="font-mono text-slate-200">computeDisclosureTag</code> and verifies EVERY historical epoch against simulated <code className="font-mono text-slate-200">epochRoots[epoch]</code> &amp; <code className="font-mono text-slate-200">auditorGrants</code>.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -1463,7 +1498,7 @@ export default function App() {
                       disabled={busyAction !== null}
                       className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
                     >
-                      Verify Disclosure Preimage Against On-Chain epochRoots &amp; auditorGrants
+                      Verify Disclosure Preimage Against Simulated epochRoots &amp; auditorGrants
                     </button>
                   </form>
 
@@ -1490,7 +1525,7 @@ export default function App() {
                         <div>Epoch #{verification.targetEpoch} Root Match: {String(verification.rootMatchesEpoch).toUpperCase()}</div>
                         <div>Disclosure Tag Hash Match: {String(verification.tagMatchesLedger).toUpperCase()}</div>
                         <div>Recomputed Root: {shortHex(verification.recomputedRoot, 18, 12)}</div>
-                        <div>On-Chain epochRoots[{verification.targetEpoch}]: {shortHex(verification.ledgerEpochRootHex ?? "missing", 18, 12)}</div>
+                        <div>Simulated epochRoots[{verification.targetEpoch}]: {shortHex(verification.ledgerEpochRootHex ?? "missing", 18, 12)}</div>
                       </div>
                     </div>
                   )}

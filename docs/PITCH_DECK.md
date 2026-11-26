@@ -5,7 +5,8 @@
 ## Slide 1: ZeroCovenant
 **Institutional Zero-Knowledge Proof-of-Solvency, Concentration Risk Covenants & Selective Auditor Disclosure on Midnight**
 - Live App: `https://zerocovenant.mevlanayalcin.com.tr`
-- Live Midnight Preview Contract (Ledger 9): `efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25` (Deploy Block `#271364`, `attestSolvency()` Block `#271369`, `grantAuditorDisclosure()` Block `#271373`)
+- Live Midnight Preview Contract (Ledger 9): `efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25` (Deploy `#271364`, `attestSolvency()` `#271369`, `grantAuditorDisclosure()` `#271373`, `tightenCovenantPolicy(125%/35%)` `#275495`, Epoch #2 `attestSolvency()` `#275514`)
+- Reproducible Deploy Script: `scripts/deploy-preview.mjs` · Interactive Web Studio: Off-Chain Compiled Compact Simulator (No Browser Proofs)
 - GitHub: `https://github.com/mevlanayalcin/zerocovenant-midnight`
 - Stack: Compact v0.28.0 (`compactc 0.36.1`), `midnightntwrk/proof-server:9.0.2`, Midnight Ledger 9, React 19 + Hono
 
@@ -82,6 +83,6 @@
 ---
 
 ## Slide 10: Live Midnight Preview Proofs & Roadmap Post-Wave 3
-- **Completed in Wave 3:** Deployed `zero_covenant.compact` live on **Midnight Preview (Ledger 9)** with real ZK proofs via `midnightntwrk/proof-server:9.0.2` (`contractAddress: efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25`, Deploy `#271364`, `attestSolvency()` `#271369`, `grantAuditorDisclosure()` `#271373`).
+- **Completed in Wave 3:** Deployed `zero_covenant.compact` live on **Midnight Preview (Ledger 9)** via reproducible `scripts/deploy-preview.mjs` + `midnightntwrk/proof-server:9.0.2`, proving ALL 3 state-mutating circuits on-chain (`contractAddress: efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25`, Deploy `#271364`, `attestSolvency()` `#271369`, `grantAuditorDisclosure()` `#271373`, `tightenCovenantPolicy()` `#275495`, Re-Attest Ep #2 `#275514`).
 - **Milestone 2:** Multi-party threshold witness feeds (read-only MPC / custodian API enclave attestations).
 - **Milestone 3:** Midnight Mainnet launch & continuous automated epoch proofs via institutional treasuries (`Meridian` x `ZeroCovenant`).

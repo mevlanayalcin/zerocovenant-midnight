@@ -7,10 +7,19 @@
   "contractAddress": "efc33d3c61ef7875f747d8a9442fa0c9e13086608f363c59d5f126ff37e24e25",
   "entityCommitmentHex": "0x6f81df981a9369333dc83eb07e0600077cf0dac3dfe098029fee1911f8e2f877",
   "deployTxId": "00069370adc4a0e602e2b0b3178901d5bfbd78513d9b9b0bc8cbaa757e00790396",
+  "deployTxHash": "792e6cfe22ce48175478e64dfcd7500fa4a139fb9784c1b5c6739ee701dd1448",
   "deployBlockHeight": 271364,
   "attestTxId": "002d90eaffec912977287b85207c5c654c69cb95a9a02165144dbcb1bf88c132cf",
+  "attestTxHash": "0492b71e9eae85d1b0e4d307980f7121ec445f00dfc8cf03b845d87469af9a63",
   "attestBlockHeight": 271369,
   "grantTxId": "00399668528b841316b3f9d8a0fbd739f2985c3da2f1d8003448b8dac4e8a8ce1e",
+  "grantTxHash": "4492e8acf53ec2b54eea62f6154385aad7fd29f84dfa8fe6ee709687a368616a",
   "grantBlockHeight": 271373,
-  "deployedAt": "2026-11-25T22:13:07.980Z"
+  "tightenTxId": "00262b90aa681b4110a63faa36d89d10a68eae1b3d4db3488d98459fb8b63b182e",
+  "tightenTxHash": "c261ff3ba90229fa3b977423652de539a6df08976ff84c3eb39e50c1ec8032ef",
+  "tightenBlockHeight": 275495,
+  "attest2TxId": "004713d57cd41358b5758f451d27f5a997d5cbd433b36aa89489ef16fa23ac5039",
+  "attest2TxHash": "a53e4f06977bcd4bada5f21dc7dbd92852b16f2d41e24daaf440c934c2cfa497",
+  "attest2BlockHeight": 275514,
+  "deployedAt": "2026-11-26T05:07:33.000Z"
 }

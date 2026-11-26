@@ -61,6 +61,21 @@ export function createZeroCovenantApp(): Hono {
   const app = new Hono();
 
   app.use("*", async (c, next) => {
+    // Redirect plain HTTP to HTTPS behind TLS-terminating reverse proxies (Cloudflare Tunnel / Nginx)
+    const forwardedProto = c.req.header("x-forwarded-proto")?.toLowerCase();
+    const host = c.req.header("host") ?? "";
+    if (
+      forwardedProto === "http" &&
+      host &&
+      !host.startsWith("localhost") &&
+      !host.startsWith("127.0.0.1")
+    ) {
+      const url = new URL(c.req.url);
+      url.protocol = "https:";
+      url.host = host;
+      return c.redirect(url.toString(), 301);
+    }
+
     await next();
     c.header("X-Content-Type-Options", "nosniff");
     c.header("X-Frame-Options", "DENY");
@@ -68,7 +83,7 @@ export function createZeroCovenantApp(): Hono {
     c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     c.header(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
     );
   });
 
@@ -91,8 +106,11 @@ export function createZeroCovenantApp(): Hono {
       ok: true,
       service: "ZeroCovenant",
       network: preview
-        ? "Midnight Preview Testnet (On-Chain Deployed + Ledger 9 WASM Interactive Studio)"
-        : "Midnight Ledger 9 WASM Simulator (Compiled compactc 0.36.1 Runtime — Off-Chain Execution)",
+        ? "Midnight Preview Testnet (On-Chain Deployed Contract) + Off-Chain Compiled Compact Simulator Studio (No Browser ZK Proofs)"
+        : "Off-Chain Compiled Compact Simulator (compactc 0.36.1 Ledger 9 Runtime — No ZK Proofs)",
+      studioExecutionMode: "offchain-compact-simulator-no-proofs",
+      studioGeneratesZkProofs: false,
+      onChainPreviewVerified: Boolean(preview),
       compilerVersion: artifacts.compilerVersion,
       languageVersion: artifacts.languageVersion,
       runtimeVersion: artifacts.runtimeVersion,
@@ -102,11 +120,28 @@ export function createZeroCovenantApp(): Hono {
             network: preview.network,
             contractAddress: preview.contractAddress,
             deployTxId: preview.deployTxId,
+            deployTxHash: preview.deployTxHash,
             deployBlockHeight: preview.deployBlockHeight,
             attestTxId: preview.attestTxId,
+            attestTxHash: preview.attestTxHash,
             attestBlockHeight: preview.attestBlockHeight,
             grantTxId: preview.grantTxId,
-            grantBlockHeight: preview.grantBlockHeight
+            grantTxHash: preview.grantTxHash,
+            grantBlockHeight: preview.grantBlockHeight,
+            ...(preview.tightenTxHash
+              ? {
+                  tightenTxId: preview.tightenTxId,
+                  tightenTxHash: preview.tightenTxHash,
+                  tightenBlockHeight: preview.tightenBlockHeight
+                }
+              : {}),
+            ...(preview.attest2TxHash
+              ? {
+                  attest2TxId: preview.attest2TxId,
+                  attest2TxHash: preview.attest2TxHash,
+                  attest2BlockHeight: preview.attest2BlockHeight
+                }
+              : {})
           }
         : null,
       timestamp: new Date().toISOString()

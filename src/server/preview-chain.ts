@@ -10,11 +10,20 @@ export interface PreviewDeploymentRecord {
   contractAddress: string;
   entityCommitmentHex: string;
   deployTxId: string;
+  deployTxHash: string;
   deployBlockHeight: number;
   attestTxId: string;
+  attestTxHash: string;
   attestBlockHeight: number;
   grantTxId: string;
+  grantTxHash: string;
   grantBlockHeight: number;
+  tightenTxId?: string;
+  tightenTxHash?: string;
+  tightenBlockHeight?: number;
+  attest2TxId?: string;
+  attest2TxHash?: string;
+  attest2BlockHeight?: number;
   deployedAt: string;
 }
 
