@@ -43,7 +43,7 @@ All three state-mutating Compact circuits (`attestSolvency`, `grantAuditorDisclo
 
 | Layer | Stored Data | Visibility |
 | :--- | :--- | :--- |
-| **Private Witness State (`ZeroCovenantPrivateState`)** | `deskSecret` (`Bytes<32>`), 4 custodian balances `b[0..3]` (`Vector<4, Uint<64>>`), `totalLiabilities` (`Uint<64>`), `epochSalt` (`Bytes<32>`) | **Browser-Local Vault / Ephemeral Prover Memory Only** — scrubbed after every circuit call and never exposed on `GET /api/v1/session` |
+| **Private Witness State (`ZeroCovenantPrivateState`)** | `deskSecret` (`Bytes<32>`), 4 custodian balances `b[0..3]` (`Vector<4, Uint<64>>`), `totalLiabilities` (`Uint<64>`), `epochSalt` (`Bytes<32>`) | **Off-Chain Simulator:** posted over HTTPS to ephemeral session memory, scrubbed immediately, never returned on `GET /api/v1/session`. **On-Chain CLI:** stays exclusively in local operator enclave alongside `proof-server`. |
 | **Public Midnight Ledger (`export ledger`)** | `epoch`, `attestationCount`, `entityCommitment`, `covenantMinRatioBps`, `covenantMaxSingleBps`, `lastSolvencyRoot`, `lastSolvencyVerified`, `lastAttestedEpoch`, `epochRoots: Map<Uint<64>, Bytes<32>>`, `usedNullifiers: Set<Bytes<32>>`, `auditorGrants: Map<Bytes<32>, Bytes<32>>` | **Public On-Chain State** — only cryptographic commitments, historical epoch roots, booleans, counters & explicit `disclose(...)` outputs |
 
 ### Compiled Compact Circuits (`compactc 0.36.1`, No `--skip-zk`)
@@ -69,7 +69,7 @@ All circuits in [`contract/src/zero_covenant.compact`](./contract/src/zero_coven
 ## Walkthrough & Interactive Features
 
 1. **Isolated Per-Visitor Sessions & Zero-Leakage Boundary**: Each browser session initializes via `POST /api/v1/session/init` with a CSPRNG 32-byte `deskSecret` and `X-Session-Token` auth. `GET /api/v1/session` returns strictly public ledger state (0 balances, 0 liabilities, 0 salts, 0 key bytes).
-2. **Dual-Ledger Proof Studio**: Edit browser-local private custodian balances/liabilities, execute compiled ZK presets (**Healthy Diversified**, **Undercollateralized <120%**, **Concentration Trap >40%**, **Cross-Epoch Salt Replay**), and inspect SVG custodian concentration vs cap.
+2. **Dual-Ledger Simulator Studio (Off-Chain, No Browser Proofs)**: Edit private custodian balances/liabilities, execute compiled Compact circuit presets (**Healthy Diversified**, **Undercollateralized <120%**, **Concentration Trap >40%**, **Cross-Epoch Salt Replay**), and inspect SVG custodian concentration vs cap.
 3. **Monotonic Covenant Governance & Adversarial Tests**: Tighten on-chain risk caps, test rejection of forbidden loosening (`100%/100%`) or impossible `<25%` caps, and run an authenticated **Rogue Key Attack Simulation** verified specifically against `"Unauthorized desk secret"`.
 4. **Historical Selective Auditor Disclosure & Independent Verifier**: Issue epoch-scoped one-way disclosure grants, advance across multiple epochs, and verify ANY historical epoch against both on-chain `epochRoots[epoch]` and `auditorGrants` (tampered historical balances are rejected immediately).
 5. **Compact Source, ZKIR & Lace Connector**: Inspect full `zero_covenant.compact`, real `.zkir` instruction counts & `.verifier` SHA-256 hashes, detect `window.midnight.mnLace`, and export Midnight artifact manifests.
@@ -98,15 +98,20 @@ To recompile the Compact contract cleanly (with `compactc` on `PATH`):
 npm run compact
 ```
 
-To reproduce the live Midnight Preview on-chain deployment and real ZK proofs from this repo:
+To reproduce a fresh Midnight Preview on-chain deployment and real ZK proofs from this repo:
 
 ```bash
-# 1. Start Midnight Ledger 9 Proof Server locally
+# 1. Compile Compact contract to generate large prover keys (gitignored in repo)
+npm run compact
+
+# 2. Start Midnight Ledger 9 Proof Server locally
 docker run -d --name midnight-proof-server -p 127.0.0.1:6300:6300 midnightntwrk/proof-server:9.0.2 -v
 
-# 2. Deploy & execute real on-chain ZK proofs (set MIDNIGHT_RUN_TIGHTEN=1 to also run tightenCovenantPolicy + Epoch #2)
+# 3. Deploy & execute real on-chain ZK proofs (set MIDNIGHT_RUN_TIGHTEN=1 to also run tightenCovenantPolicy + Epoch #2)
 MIDNIGHT_PREVIEW_SEED=<64-hex-seed> MIDNIGHT_RUN_TIGHTEN=1 node scripts/deploy-preview.mjs
 ```
+
+> Note: On the live deployment (`efc33d3c...`), transactions 1–3 were executed during initial deployment and transactions 4–5 (`tightenCovenantPolicy` + Epoch #2 `attestSolvency`) were executed later against the same deployed contract via `findDeployedContract` using the persisted LevelDB private state; setting `MIDNIGHT_RUN_TIGHTEN=1` reproduces the entire 5-transaction sequence in one run on a fresh contract.
 
 ---
 
